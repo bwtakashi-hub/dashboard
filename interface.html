@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シート管理ダッシュボード</title>
+  <style>
+    :root {
+      --color-yellow:        #f5c518;
+      --color-yellow-hover:  #e0b000;
+      --color-yellow-text:   #5a4000;
+
+      --color-blue:          #2563eb;
+      --color-blue-hover:    #1d4ed8;
+
+      --color-navy:          #1e3a5f;
+      --color-navy-hover:    #152c47;
+
+      --color-green:         #16a34a;
+      --color-green-hover:   #15803d;
+
+      --color-disabled-bg:   #e2e8f0;
+      --color-disabled-text: #94a3b8;
+
+      --color-bg:            #f1f5f9;
+      --color-surface:       #ffffff;
+      --color-text-white:    #ffffff;
+      --color-text-dark:     #0f172a;
+
+      --radius:              12px;
+      --radius-sm:           8px;
+      --shadow:              0 2px 8px rgba(0,0,0,0.10);
+      --shadow-hover:        0 8px 24px rgba(0,0,0,0.18);
+      --transition:          0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'Segoe UI', sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text-dark);
+      min-height: 100vh;
+      padding: 32px 16px 56px;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .page-header h1 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--color-text-dark);
+    }
+
+    .page-header p {
+      margin-top: 6px;
+      font-size: 0.88rem;
+      color: #64748b;
+    }
+
+    .dashboard {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .section {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .section-label {
+      padding: 13px 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .section-body {
+      padding: 16px 20px 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid-1 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+    .box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-family: inherit;
+      font-size: 0.97rem;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+      box-shadow: var(--shadow);
+      outline: none;
+      position: relative;
+    }
+
+    .box:focus-visible {
+      outline: 3px solid #60a5fa;
+      outline-offset: 2px;
+    }
+
+    a.box:hover {
+      transform: translateY(-3px) scale(1.01);
+      box-shadow: var(--shadow-hover);
+    }
+    a.box:active {
+      transform: translateY(0) scale(0.99);
+    }
+
+    .box-label { flex: 1; }
+
+    .box-arrow {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      flex-shrink: 0;
+    }
+
+    .box-yellow {
+      background: var(--color-yellow);
+      color: var(--color-yellow-text);
+    }
+    a.box-yellow:hover { background: var(--color-yellow-hover); }
+
+    .box-blue {
+      background: var(--color-blue);
+      color: var(--color-text-white);
+    }
+    a.box-blue:hover { background: var(--color-blue-hover); }
+
+    .box-navy {
+      background: var(--color-navy);
+      color: var(--color-text-white);
+    }
+    a.box-navy:hover { background: var(--color-navy-hover); }
+
+    .box-green {
+      background: var(--color-green);
+      color: var(--color-text-white);
+    }
+    a.box-green:hover { background: var(--color-green-hover); }
+
+    .box-disabled {
+      background: var(--color-disabled-bg);
+      color: var(--color-disabled-text);
+      cursor: default;
+      box-shadow: none;
+    }
+
+    .box-lg {
+      padding: 22px 24px;
+      font-size: 1.05rem;
+    }
+
+    .box-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .search-wrap {
+      max-width: 860px;
+      margin: 0 auto 28px;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px 16px;
+      align-items: center;
+    }
+
+    .search-bar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 1rem;
+      font-family: inherit;
+      color: var(--color-text-dark);
+      background: transparent;
+    }
+
+    .search-bar input::placeholder { color: #94a3b8; }
+
+    .search-bar button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+
+    .search-bar button:hover { background: #1d4ed8; }
+
+    .search-results {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .result-item {
+      background: var(--color-surface);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow var(--transition), transform var(--transition);
+    }
+
+    .result-item:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-1px);
+    }
+
+    .result-meta {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    .result-meta strong {
+      color: #2563eb;
+    }
+
+    .result-preview {
+      font-size: 0.92rem;
+      color: #1e293b;
+      word-break: break-all;
+    }
+
+    .result-empty {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      padding: 16px;
+    }
+
+    .search-status {
+      font-size: 0.82rem;
+      color: #64748b;
+      padding: 4px 2px;
+    }
+
+    @media (max-width: 620px) {
+      body { padding: 20px 12px 40px; }
+      .page-header h1 { font-size: 1.25rem; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .box { font-size: 0.9rem; padding: 15px 16px; }
+      .box-lg { font-size: 0.96rem; padding: 18px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>シート管理ダッシュボード</h1>
+    <p>Googleスプレッドシートへのクイックアクセス</p>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-bar">
+      <span>&#128269;</span>
+      <input type="text" id="searchInput" placeholder="全シートを横断検索... (例: 請求書、山田、2024)" />
+      <button onclick="doSearch()">検索</button>
+    </div>
+    <div class="search-status" id="searchStatus"></div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <div class="dashboard">
+
+    <!-- クレジットカード / 書類 -->
+    <div class="section">
+      <div class="section-label">クレジットカード / 書類</div>
+      <div class="section-body grid-3">
+        <a class="box box-yellow box-lg" href="https://script.google.com/macros/s/AKfycbzXSmdmdt7EQmtFAvNXVJgR2TdsSHGAcxQxTqjGVE6_OZaWFqIHPwISR214anBNSMCWkA/exec?mode=simple" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128228;</span>
+          <span class="box-label">請求書アップロード</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-yellow box-lg" href="https://docs.google.com/spreadsheets/d/1ZupMnR01Vuz4HK1Hv_uDJyUX-gUN5YyoS84p59mQ0YE/edit" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128179;</span>
+          <span class="box-label">クレジットカード明細</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-yellow box-lg" href="https://drive.google.com/drive/u/0/folders/1wlhCrYlPtwq1PgUh4w-UgNc59OFYKnro" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128193;</span>
+          <span class="box-label">請求書保管庫</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-yellow box-lg" href="https://drive.google.com/drive/folders/1rC6Qdh1EtrBNKWkCByPBEWqH0UnpasDE?usp=drive_link" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128229;</span>
+          <span class="box-label">&#12459;&#12540;&#12489;&#26126;&#32048;&#12450;&#12483;&#12503;&#12525;&#12540;&#12489;</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 種子島 -->
+    <div class="section">
+      <div class="section-label">?? 種子島</div>
+      <div class="section-body grid-3">
+        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1KPPixLk7lQB5-IygZcCcRaWtHgPb8-K01wGbI01JI9Q/edit" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128203;</span>
+          <span class="box-label">請求管理</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1eAaFwzy3lE3kOhQerv5QnV4SXbCRPTbFNAUnjfQ5EDw/edit" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128200;</span>
+          <span class="box-label">売上管理</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1e6M8VywSYBX12KAHSSerRPqz_rlQ4cjt4iPIc05fAXY/edit?gid=405428118#gid=405428118" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128444;</span>
+          <span class="box-label">スマレジ売上</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128176;</span>
+          <span class="box-label">収支管理</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128210;</span>
+          <span class="box-label">&#29694;&#37329;&#20986;&#32013;&#24115;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 不動産 -->
+    <div class="section">
+      <div class="section-label">?? 不動産</div>
+      <div class="section-body grid-3">
+        <a class="box box-navy" href="https://docs.google.com/spreadsheets/d/1i4H9x1nUcvi9dC724YZwOl1y6y9logaIv8ZXyp0wLQ0/edit" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128203;</span>
+          <span class="box-label">請求管理</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128202;</span>
+          <span class="box-label">売上管理</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128180;</span>
+          <span class="box-label">収支管理</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#127970;</span>
+          <span class="box-label">物件管理</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128273;</span>
+          <span class="box-label">賃貸管理</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128210;</span>
+          <span class="box-label">&#29694;&#37329;&#20986;&#32013;&#24115;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 売上管理 -->
+    <div class="section">
+      <div class="section-label">?? 売上管理</div>
+      <div class="section-body grid-3">
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#127807;</span>
+          <span class="box-label">種子島売上</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128201;</span>
+          <span class="box-label">売上統計</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128269;</span>
+          <span class="box-label">収支確認</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcfrGmPgx9ALSIhJhMDpBDFx1H7SSOHpcVLLTvsH5PDOlp7rGJ7roz0znmKpNmGuDs8Q/exec';
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const searchStatus = document.getElementById('searchStatus');
+
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    function doSearch() {
+      const query = searchInput.value.trim();
+      if (!query) {
+        searchResults.innerHTML = '';
+        searchStatus.textContent = '';
+        return;
+      }
+
+      searchStatus.textContent = '検索&#20013;...';
+      searchResults.innerHTML = '';
+
+      const url = APPS_SCRIPT_URL + '?q=' + encodeURIComponent(query);
+
+      fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(json) {
+          const results = json.results || [];
+          searchStatus.textContent = '&#12300;' + query + '&#12301;&#12398;検索&#32080;&#26524;: ' + results.length + '&#20214;';
+
+          if (results.length === 0) {
+            searchResults.innerHTML = '<div class="result-empty">&#35413;&#24403;&#12377;&#12427;データが見つかりませんでした</div>';
+            return;
+          }
+
+          searchResults.innerHTML = results.map(function(r) {
+            return '<a class="result-item" href="' + r.url + '" target="_blank" rel="noopener noreferrer">' +
+              '<div class="result-meta"><strong>' + r.sheet + '</strong> &rsaquo; ' + r.tab + ' &rsaquo; ' + r.row + '&#34892;&#30446;</div>' +
+              '<div class="result-preview">' + escapeHtml(r.preview) + '</div>' +
+            '</a>';
+          }).join('');
+        })
+        .catch(function(err) {
+          searchStatus.textContent = '';
+          searchResults.innerHTML = '<div class="result-empty">&#9888;&#65039; 検索&#12456;&#12521;&#12540;: ' + err.message + '</div>';
+        });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
