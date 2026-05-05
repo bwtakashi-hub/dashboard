@@ -19,6 +19,9 @@
       --color-green:         #16a34a;
       --color-green-hover:   #15803d;
 
+      --color-purple:        #7c3aed;
+      --color-purple-hover:  #6d28d9;
+
       --color-disabled-bg:   #e2e8f0;
       --color-disabled-text: #94a3b8;
 
@@ -160,6 +163,12 @@
       color: var(--color-text-white);
     }
     a.box-green:hover { background: var(--color-green-hover); }
+
+    .box-purple {
+      background: var(--color-purple);
+      color: var(--color-text-white);
+    }
+    a.box-purple:hover { background: var(--color-purple-hover); }
 
     .box-disabled {
       background: var(--color-disabled-bg);
@@ -305,14 +314,9 @@
     <div class="section">
       <div class="section-label">クレジットカード / 書類</div>
       <div class="section-body grid-3">
-        <a class="box box-yellow box-lg" href="https://script.google.com/macros/s/AKfycbxzh_oVBeo6dUkdjMr1yKhAeytTPE5DqghvDtE-8974gXECb4rRD0HjxPDK_4QJKu5OvQ/exec?mode=simple" target="_blank" rel="noopener noreferrer">
+        <a class="box box-yellow box-lg" href="https://script.google.com/macros/s/AKfycbzDuntrII71bFGEdJfCc_ZjzYY5fxm0XDAII9h8sFsdHipN8wTmDFUbjA0W5Jchwp-flQ/exec?mode=simple" target="_blank" rel="noopener noreferrer">
           <span class="box-icon">&#128228;</span>
           <span class="box-label">請求書アップロード</span>
-          <span class="box-arrow">&#x2197;</span>
-        </a>
-        <a class="box box-yellow box-lg" href="https://script.google.com/macros/s/AKfycbxzh_oVBeo6dUkdjMr1yKhAeytTPE5DqghvDtE-8974gXECb4rRD0HjxPDK_4QJKu5OvQ/exec?mode=simple" target="_blank" rel="noopener noreferrer">
-          <span class="box-icon">&#128228;</span>
-          <span class="box-label">住まっぷ 不動産</span>
           <span class="box-arrow">&#x2197;</span>
         </a>
         <a class="box box-yellow box-lg" href="https://docs.google.com/spreadsheets/d/1ZupMnR01Vuz4HK1Hv_uDJyUX-gUN5YyoS84p59mQ0YE/edit" target="_blank" rel="noopener noreferrer">
@@ -330,17 +334,12 @@
           <span class="box-label">&#12459;&#12540;&#12489;&#26126;&#32048;&#12450;&#12483;&#12503;&#12525;&#12540;&#12489;</span>
           <span class="box-arrow">&#x2197;</span>
         </a>
-        <a class="box box-yellow box-lg" href="https://docs.google.com/spreadsheets/d/1N0-xidejNyC19WGkaN4ANntHnV3JJ9qtOFFpu34s_RI/edit" target="_blank" rel="noopener noreferrer">
-          <span class="box-icon">&#128450;</span>
-          <span class="box-label">&#36578;&#35352;&#29992;&#12288;&#37096;&#38272;&#12539;&#37096;&#32626;&#12539;&#31185;&#30446;&#12522;&#12473;&#12488;&#12394;&#12393;</span>
-          <span class="box-arrow">&#x2197;</span>
-        </a>
       </div>
     </div>
 
     <!-- 種子島 -->
     <div class="section">
-      <div class="section-label">&#127965; 種子島</div>
+      <div class="section-label">?? 種子島</div>
       <div class="section-body grid-3">
         <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1KPPixLk7lQB5-IygZcCcRaWtHgPb8-K01wGbI01JI9Q/edit" target="_blank" rel="noopener noreferrer">
           <span class="box-icon">&#128203;</span>
@@ -357,12 +356,11 @@
           <span class="box-label">スマレジ売上</span>
           <span class="box-arrow">&#x2197;</span>
         </a>
-        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1Q_HuBRHIQsKRPQPhn_ktAeotPTvA1-NR2c9uRhG64Vk/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer">
+        <div class="box box-disabled" aria-disabled="true">
           <span class="box-icon">&#128176;</span>
           <span class="box-label">収支管理</span>
-          <span class="box-arrow">&#x2197;</span>
-        </a>
-        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1z11NsAI3bXMQ2p6VyjLugPWVxu5WaGzmUuigs4nF-BU/edit?gid=1961517717#gid=1961517717" target="_blank" rel="noopener noreferrer">
+        </div>
+        <a class="box box-blue" href="https://docs.google.com/spreadsheets/d/1z11NsAI3bXMQ2p6VyjLugPWVxu5WaGzmUuigs4nF-BU/edit?gid=902423049#gid=902423049" target="_blank" rel="noopener noreferrer">
           <span class="box-icon">&#128210;</span>
           <span class="box-label">&#29694;&#37329;&#20986;&#32013;&#24115;</span>
           <span class="box-arrow">&#x2197;</span>
@@ -372,7 +370,7 @@
 
     <!-- 不動産 -->
     <div class="section">
-      <div class="section-label">&#127970; 不動産</div>
+      <div class="section-label">🏢 不動産</div>
       <div class="section-body grid-3">
         <a class="box box-navy" href="https://docs.google.com/spreadsheets/d/1i4H9x1nUcvi9dC724YZwOl1y6y9logaIv8ZXyp0wLQ0/edit" target="_blank" rel="noopener noreferrer">
           <span class="box-icon">&#128203;</span>
@@ -395,17 +393,83 @@
           <span class="box-icon">&#128273;</span>
           <span class="box-label">賃貸管理</span>
         </div>
-        <a class="box box-navy" href="https://docs.google.com/spreadsheets/d/1WCS2P77C8l38eX8CmdwXLDqsMrR6jOJeegS5yunihHI/edit?gid=1961517717#gid=1961517717" target="_blank" rel="noopener noreferrer">
+        <div class="box box-disabled" aria-disabled="true">
           <span class="box-icon">&#128210;</span>
           <span class="box-label">&#29694;&#37329;&#20986;&#32013;&#24115;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 同盟関連 -->
+    <div class="section">
+      <div class="section-label">🤝 同盟関連</div>
+      <div class="section-body grid-3">
+        <a class="box box-purple" href="https://drive.google.com/drive/folders/1z_xT6lMuCdEB7HJmWWByxpJ9sr_TqoZ4" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128193;</span>
+          <span class="box-label">物件書類格納庫</span>
           <span class="box-arrow">&#x2197;</span>
         </a>
+        <a class="box box-purple" href="https://docs.google.com/spreadsheets/d/13_jeQc7FYzX_TmDOlccVmgJfgCt-ujiWqEUeryt4S8I/edit?gid=1871889121#gid=1871889121" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#127968;</span>
+          <span class="box-label">同盟物件一覧（住まっぷ）</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-purple" href="https://docs.google.com/spreadsheets/d/1BkKJpM93BUnbwyrZIYo6D_kOVuJKV9oGpyONOb_eCrs/edit?gid=423970402#gid=423970402" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128218;</span>
+          <span class="box-label">同盟物件一覧（大元データ）</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-purple" href="https://docs.google.com/spreadsheets/d/1Y2iu9hARYCBdDE1_TKBLvvVGiUFotDgftiu4O6uJgqQ/edit?gid=236163215#gid=236163215" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128269;</span>
+          <span class="box-label">JKAS査定 依頼リスト</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <a class="box box-purple" href="https://docs.google.com/spreadsheets/d/1nGW3UqCuRjZNO1veALNRYWz9EaTqzpa1gM-kUZQYztU/edit?gid=423970402#gid=423970402" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#128196;</span>
+          <span class="box-label">各種作成書類</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 予備バナー -->
+    <div class="section">
+      <div class="section-label">⭐ 予備バナー</div>
+      <div class="section-body grid-3">
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備①</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備②</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備③</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備④</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備⑤</span>
+        </div>
+        <div class="box box-disabled" aria-disabled="true">
+          <span class="box-icon">&#128337;</span>
+          <span class="box-label">予備⑥</span>
+        </div>
       </div>
     </div>
 
     <!-- 売上管理 -->
     <div class="section">
-      <div class="section-label">&#128202; 売上管理</div>
+      <div class="section-label">?? 売上管理</div>
       <div class="section-body grid-3">
         <div class="box box-disabled" aria-disabled="true">
           <span class="box-icon">&#127807;</span>
