@@ -3668,12 +3668,22 @@ function resetSimulatorForm(){
   STATE.currentPropertyId = '';
   STATE.result = null;
   STATE.files = { deed:[], map:[], rr:[], drive:[], exp:[], tax:[] };
-  // ファイルチップ・AI結果表示エリアクリア
+  // ファイルチップ・動的に生成された結果表示エリアのみクリア
+  // ⚠ #aiResult はSTEP4で内部に固定DOM要素（mkCapMid等）を持つため innerHTML='' しない
   ['#deedFiles','#mapFiles','#rrFiles','#expFiles','#taxFiles','#driveFiles',
-   '#reinfoResult','#areaInfoResult','#aiResult','#expResult','#taxResult','#webFillResult'].forEach(s=>{
+   '#reinfoResult','#areaInfoResult','#expResult','#taxResult','#webFillResult'].forEach(s=>{
     const el = $(s); if(el) el.innerHTML='';
   });
+  // AI相場調査エリアは非表示にするだけ（中身DOMは保持）
+  $('#aiResult')?.classList.add('hide');
   $('#aiLoad')?.classList.add('hide');
+  // 表示テキストはデフォルトに戻す
+  ['mkCapMid','mkCapRng','mkVac','mkSqm','mkTrend','mkComment'].forEach(id=>{
+    const el = $('#'+id); if(el) el.textContent = '-';
+  });
+  ['mkStrength','mkRisk'].forEach(id=>{
+    const el = $('#'+id); if(el) el.innerHTML = '';
+  });
   // localStorage（編集中スナップショットのみクリア）
   localStorage.removeItem(CURRENT_ID_KEY);
   localStorage.removeItem('appraisal_snapshot_v1');
