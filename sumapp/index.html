@@ -381,6 +381,24 @@
     <h2>STEP 1 — 物件基本情報</h2>
     <p class="desc">物件の基本スペックを入力してください。謄本・公図・レントロールをアップロードするとAIが自動で読み取ります。</p>
 
+    <!-- 物件種別 ＋ 必要資料リスト -->
+    <div style="margin-bottom:14px;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(14,165,233,0.10));border:1px solid rgba(245,158,11,0.35)">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-weight:700;font-size:14px;letter-spacing:.05em">📦 物件種別</div>
+        <select class="fld" id="propType" style="max-width:240px">
+          <option value="一棟マンション">一棟マンション</option>
+          <option value="一棟アパート">一棟アパート</option>
+          <option value="一棟テナント">一棟テナントビル</option>
+          <option value="区分マンション">区分マンション</option>
+          <option value="土地建物">土地/建物（古家付き・戸建）</option>
+          <option value="土地">土地のみ</option>
+          <option value="その他">その他</option>
+        </select>
+        <button class="btn btn-primary" id="btnDocList" style="padding:8px 14px;font-size:12px">📋 ご用意いただく資料一覧</button>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:8px">操作前に物件種別を選択 →「📋 ご用意いただく資料一覧」で必要書類を確認。アップロードで自動入力できます。</div>
+    </div>
+
     <!-- Google Drive Folder Import -->
     <div style="margin-bottom:18px;padding:18px;border-radius:14px;background:linear-gradient(135deg,rgba(66,133,244,0.10),rgba(52,168,83,0.10));border:1px solid rgba(66,133,244,0.3)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -814,8 +832,10 @@
               <th style="width:40px">#</th>
               <th>物件名</th>
               <th>所在地</th>
+              <th>種別</th>
               <th>構造/築年</th>
               <th style="text-align:right">戸数</th>
+              <th style="text-align:right">販売価格</th>
               <th style="text-align:right">査定中央値</th>
               <th>登録日時</th>
               <th style="width:280px">操作</th>
@@ -847,6 +867,20 @@
     <div id="gaiyouContainer" style="background:#fff;color:#000;padding:0;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.3);overflow:hidden"></div>
   </section>
 
+</div>
+
+<!-- ===== 必要資料モーダル ===== -->
+<div id="docListModal" class="hide" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px)">
+  <div style="background:linear-gradient(135deg,#0a1226,#060b18);border:1px solid var(--card-border);border-radius:18px;max-width:920px;width:100%;max-height:88vh;overflow-y:auto">
+    <div style="position:sticky;top:0;background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(14,165,233,0.18));backdrop-filter:blur(10px);padding:18px 24px;border-bottom:1px solid var(--card-border);display:flex;justify-content:space-between;align-items:center;border-radius:18px 18px 0 0">
+      <div>
+        <h2 style="font-size:18px;letter-spacing:.04em">📋 ご用意いただく資料一覧</h2>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px">物件種別に応じた必要書類。アップロードでAI自動入力対応</div>
+      </div>
+      <button class="btn btn-ghost" id="closeDocList" style="padding:6px 14px">✕ 閉じる</button>
+    </div>
+    <div id="docListBody" style="padding:24px"></div>
+  </div>
 </div>
 
 <!-- ===== Glossary Modal ===== -->
@@ -1179,6 +1213,7 @@ function collectAll(){
     pref: $('#propPref').value,
     city: $('#propCity').value,
     addr: $('#propAddr').value,
+    propertyType: $('#propType')?.value || '一棟マンション',
     lands, buildings,
     land: totalLand,
     floor: totalFloor,
@@ -3861,13 +3896,18 @@ function renderPropertyList(){
   empty.style.display='none';
   tbody.innerHTML = list.map((p,i)=>{
     const updated = new Date(p.updatedAt).toLocaleString('ja-JP');
+    const shubetsu = p.snapshot?.basic?.propertyType || p.snapshot?.gaiyouOverride?.shubetsu || '一棟マンション';
+    const salePrice = p.snapshot?.gaiyouOverride?.salePrice;
+    const saleDisp = salePrice ? '¥'+Number(salePrice).toLocaleString('ja-JP') : '—';
     return `
       <tr>
         <td>${i+1}</td>
         <td><b>${p.name}</b></td>
         <td style="font-size:12px;color:var(--sub)">${p.addr||'—'}</td>
+        <td style="font-size:12px"><span style="padding:2px 8px;border-radius:99px;background:rgba(14,165,233,0.15);color:#0ea5e9;font-size:11px">${shubetsu}</span></td>
         <td style="font-size:12px">${p.struct||'—'} / ${p.year?p.year+'年':'—'}</td>
         <td style="text-align:right;font-family:Inter">${p.units}戸</td>
+        <td style="text-align:right;font-family:Inter;color:var(--green);font-weight:700">${saleDisp}</td>
         <td style="text-align:right;font-family:Inter;color:var(--blue);font-weight:700">${p.priceMid?fmtMan(p.priceMid):'—'}</td>
         <td style="font-size:11px;color:var(--sub)">${updated}</td>
         <td class="prop-actions">
@@ -4338,6 +4378,143 @@ function bindGaiyouEvents(){
 }
 
 /* =========================================================
+ *  物件種別別 必要資料リスト
+ * ========================================================= */
+const DOC_LIST = {
+  '一棟マンション': {
+    icon:'🏢',
+    docs: [
+      ['謄本（土地・建物・全部事項証明書）', '必須'],
+      ['公図・地積測量図', '必須'],
+      ['固定資産税納税通知書・公課証明', '必須'],
+      ['レントロール（最新）', '必須'],
+      ['月次収支報告書・年間収支報告書（管理会社発行）', '必須'],
+      ['賃貸借契約書（全室）', '推奨'],
+      ['修繕履歴・修繕積立金残高', '推奨'],
+      ['建築確認済証・検査済証', '推奨'],
+      ['消防設備点検報告書（直近）', '任意'],
+    ]
+  },
+  '一棟アパート': {
+    icon:'🏘',
+    docs: [
+      ['謄本（土地・建物・全部事項証明書）', '必須'],
+      ['公図・地積測量図', '必須'],
+      ['固定資産税納税通知書・公課証明', '必須'],
+      ['レントロール（最新）', '必須'],
+      ['月次収支報告書・年間収支報告書', '必須'],
+      ['賃貸借契約書（全室）', '推奨'],
+      ['修繕履歴', '推奨'],
+      ['建築確認済証・検査済証', '推奨'],
+    ]
+  },
+  '一棟テナント': {
+    icon:'🏢',
+    docs: [
+      ['謄本（土地・建物・全部事項証明書）', '必須'],
+      ['公図・地積測量図', '必須'],
+      ['固定資産税納税通知書', '必須'],
+      ['レントロール（最新／全テナント）', '必須'],
+      ['賃貸借契約書（全テナント）', '必須'],
+      ['保証金預り証', '必須'],
+      ['建築確認済証・検査済証', '推奨'],
+      ['消防設備点検報告書（直近）', '推奨'],
+      ['エレベーター保守契約書・点検報告', '推奨'],
+      ['修繕履歴・修繕積立金残高', '推奨'],
+      ['アスベスト調査報告書（築古の場合）', '推奨'],
+      ['土壌汚染調査報告書（該当の場合）', '任意'],
+    ]
+  },
+  '区分マンション': {
+    icon:'🏬',
+    docs: [
+      ['謄本（土地・建物）', '必須'],
+      ['管理規約・使用細則', '必須'],
+      ['長期修繕計画書', '必須'],
+      ['修繕積立金残高証明', '必須'],
+      ['固定資産税納税通知書', '必須'],
+      ['重要事項に係る調査報告書（管理会社発行）', '必須'],
+      ['賃貸借契約書（賃貸中の場合）', '推奨'],
+      ['専有部分のリフォーム履歴', '任意'],
+    ]
+  },
+  '土地建物': {
+    icon:'🏠',
+    docs: [
+      ['謄本（土地・建物）', '必須'],
+      ['公図・地積測量図', '必須'],
+      ['固定資産税納税通知書', '必須'],
+      ['建築確認済証・検査済証', '推奨'],
+      ['境界確認書', '推奨'],
+      ['賃貸借契約書（賃貸中の場合）', '賃貸時必須'],
+      ['リフォーム・修繕履歴', '任意'],
+      ['設備一覧（給湯・空調等）', '任意'],
+    ]
+  },
+  '土地': {
+    icon:'🌳',
+    docs: [
+      ['謄本（土地）', '必須'],
+      ['公図・地積測量図', '必須'],
+      ['固定資産税納税通知書', '必須'],
+      ['境界確認書', '推奨'],
+      ['土壌汚染調査報告書（該当の場合）', '任意'],
+      ['農地転用許可関連書類（農地の場合）', '農地時必須'],
+      ['開発許可関連書類（該当の場合）', '任意'],
+    ]
+  },
+  'その他': {
+    icon:'📄',
+    docs: [
+      ['謄本', '必須'],
+      ['固定資産税納税通知書', '必須'],
+      ['物件種別に応じた書類', '推奨'],
+    ]
+  },
+};
+
+function renderDocList(type){
+  const d = DOC_LIST[type] || DOC_LIST['その他'];
+  const html = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px;border-radius:10px;background:rgba(245,158,11,0.10)">
+      <div style="font-size:32px">${d.icon}</div>
+      <div>
+        <div style="font-size:16px;font-weight:800">${type}</div>
+        <div style="font-size:11px;color:var(--sub)">以下の書類をアップロードしてください（PDF/Excel/画像 対応）</div>
+      </div>
+    </div>
+    <div style="display:grid;gap:6px">
+      ${d.docs.map(([name, lvl])=>{
+        const color = lvl==='必須' ? '#ef4444' : lvl==='推奨' ? '#f59e0b' : lvl.includes('時') ? '#8b5cf6' : '#64748b';
+        const bg = lvl==='必須' ? 'rgba(239,68,68,0.08)' : lvl==='推奨' ? 'rgba(245,158,11,0.08)' : lvl.includes('時') ? 'rgba(139,92,246,0.08)' : 'rgba(100,116,139,0.08)';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:${bg};border-left:3px solid ${color}">
+          <span style="font-size:13px">${name}</span>
+          <span style="font-size:10px;font-weight:700;color:${color};padding:2px 8px;border-radius:99px;border:1px solid ${color}">${lvl}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:14px;padding:10px;border-radius:8px;background:rgba(14,165,233,0.08);font-size:11px;line-height:1.7">
+      💡 <b>STEP1のGoogle Driveフォルダ取込</b> or <b>各アップロードエリア</b> から書類を投入 →
+      AI解析で物件情報・レントロール・経費・税額を自動入力できます。
+    </div>`;
+  $('#docListBody').innerHTML = html;
+}
+
+setTimeout(()=>{
+  $('#btnDocList')?.addEventListener('click', ()=>{
+    const type = $('#propType')?.value || '一棟マンション';
+    renderDocList(type);
+    $('#docListModal').classList.remove('hide');
+  });
+  $('#closeDocList')?.addEventListener('click', ()=>$('#docListModal').classList.add('hide'));
+  $('#docListModal')?.addEventListener('click', e=>{ if(e.target.id==='docListModal') $('#docListModal').classList.add('hide'); });
+  // propType を STATE / collectAll で永続化
+  $('#propType')?.addEventListener('change', ()=>{
+    if(STATE.basic) STATE.basic.propertyType = $('#propType').value;
+  });
+}, 400);
+
+/* =========================================================
  *  用語集データ
  * ========================================================= */
 const GLOSSARY = [
@@ -4464,6 +4641,7 @@ function loadSnapshot(){
       if(b.pref) $('#propPref').value = b.pref;
       if(b.city) $('#propCity').value = b.city;
       if(b.addr) $('#propAddr').value = b.addr;
+      if(b.propertyType && $('#propType')) $('#propType').value = b.propertyType;
 
       if(Array.isArray(b.lands) && b.lands.length){
         $('#landBody').innerHTML = '';
