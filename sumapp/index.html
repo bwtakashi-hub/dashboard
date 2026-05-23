@@ -1843,16 +1843,32 @@ const REINFO_API_LIST = [
   { id:'XKT031', name:'人口集中地区', cat:'立地', type:'polygon' },
 ];
 
-async function fetchReinfoAPI(apiId, lat, lon, zoom=13){
+/* API別の最適zoomレベル（広範囲が必要な施設系はzoomを下げる） */
+const ZOOM_BY_API = {
+  // 施設系（広く取得）— zoom=11は約20km四方
+  XKT004:12, XKT005:12, XKT006:11, XKT007:11,
+  XKT010:11, XKT011:11, XKT015:11, XKT017:11,
+  XKT018:11, XKT019:11, XPT002:11,
+  // 法規制系（精密でOK）— zoom=14は約2.5km四方
+  XKT002:14, XKT001:14, XKT014:14, XKT023:14, XKT024:14, XKT030:14, XKT003:14,
+  // 防災系（広めに）— zoom=12は約10km四方
+  XKT016:12, XKT020:12, XKT021:12, XKT022:12, XKT025:12,
+  XKT026:12, XKT027:12, XKT028:12, XKT029:12,
+  // その他統計
+  XKT013:11, XKT031:12,
+};
+
+async function fetchReinfoAPI(apiId, lat, lon, zoom){
   if(!STATE.reinfoKey || !/^https?:\/\//.test(STATE.reinfoKey)){
     throw new Error('GASプロキシURL未設定');
   }
+  const z = zoom || ZOOM_BY_API[apiId] || 13;
   const u = new URL(STATE.reinfoKey);
   const rawKey = u.searchParams.get('key') || '';
   u.searchParams.set('api', apiId);
   u.searchParams.set('lat', String(lat));
   u.searchParams.set('lon', String(lon));
-  u.searchParams.set('zoom', String(zoom));
+  u.searchParams.set('zoom', String(z));
   if(rawKey) u.searchParams.set('key', rawKey.trim());
   const res = await fetch(u.toString(), { redirect:'follow', mode:'cors' });
   if(!res.ok) throw new Error(`HTTP ${res.status}`);
