@@ -329,7 +329,7 @@
       <span class="pill" id="driveStatus">Drive: 未設定</span>
       <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px" />
       <span class="pill" id="reinfoStatus">不動産Lib: 未設定</span>
-      <input type="password" id="reinfoKey" placeholder="不動産情報ライブラリ API Key" autocomplete="off" style="width:160px;font-family:monospace;font-size:11px" />
+      <input type="password" id="reinfoKey" placeholder="GASプロキシURL or 不動産Lib APIキー" autocomplete="off" style="width:240px;font-family:monospace;font-size:11px" title="GASプロキシのWebアプリURL（推奨）または不動産情報ライブラリのAPIキー（CORS未対応）" />
       <button class="btn btn-ghost" id="saveKey" style="padding:6px 10px;font-size:11px">保存</button>
       <button class="btn btn-ghost" id="toggleKey" style="padding:6px 8px;font-size:11px" title="表示/非表示">👁</button>
       <button class="btn btn-ghost" id="openGlossary" style="padding:6px 8px;font-size:11px" title="不動産投資 用語集">📖</button>
@@ -1685,18 +1685,31 @@ function latLon2tile(lat, lon, zoom){
   return { x, y, z: zoom };
 }
 
-/* 不動産情報ライブラリ XKT002（用途地域）GeoJSON取得 */
+/* 不動産情報ライブラリ XKT002（用途地域）GeoJSON取得
+   ※ MLIT APIはCORS未対応のため、GASプロキシ経由で呼ぶ
+   reinfoKey が "https://script.google.com/..." 形式ならプロキシURL扱い
+   それ以外は直接APIキーとして呼ぶ（ローカル file://環境などで動作）
+*/
 async function fetchReinfoZoning(lat, lon){
-  if(!STATE.reinfoKey) throw new Error('不動産情報ライブラリAPIキー未設定');
+  if(!STATE.reinfoKey) throw new Error('不動産情報ライブラリAPIキー（またはGASプロキシURL）未設定');
   const zoom = 13;
   const t = latLon2tile(lat, lon, zoom);
-  const url = `https://www.reinfolib.mlit.go.jp/ex-api/external/XKT002?response_format=geojson&z=${t.z}&x=${t.x}&y=${t.y}`;
-  const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': STATE.reinfoKey } });
+  let res;
+  if(/^https?:\/\//.test(STATE.reinfoKey)){
+    // GASプロキシURL経由
+    const proxyUrl = STATE.reinfoKey.replace(/\?.*$/,'') + `?api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
+    res = await fetch(proxyUrl);
+  } else {
+    // 直接呼び出し（CORS失敗の可能性大）
+    const url = `https://www.reinfolib.mlit.go.jp/ex-api/external/XKT002?response_format=geojson&z=${t.z}&x=${t.x}&y=${t.y}`;
+    res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': STATE.reinfoKey } });
+  }
   if(!res.ok){
     const txt = await res.text();
     throw new Error(`不動産Lib API ${res.status}: ${txt.slice(0,200)}`);
   }
   const geo = await res.json();
+  if(geo.error) throw new Error('プロキシエラー: '+geo.error);
   // 該当ポイントを含むポリゴンを探索（簡易：最初の feature を採用）
   if(!geo.features || !geo.features.length) return null;
   // point-in-polygon判定（簡易・Ray casting）
