@@ -3623,12 +3623,34 @@ function showView(v){
   if(v==='home') updateHomeStat();
   if(v==='list') renderPropertyList();
   window.scrollTo({top:0,behavior:'instant'});
-  // 印刷用クラス
   document.body.classList.toggle('print-gaiyou', v==='gaiyou');
 }
+
+/* シミュレーター完全リセット（APIキー・登録物件は保持） */
+function resetSimulatorAndReload(){
+  STATE.currentPropertyId = '';
+  localStorage.removeItem(CURRENT_ID_KEY);
+  localStorage.removeItem('appraisal_snapshot_v1');
+  location.hash = '#simulator';
+  location.reload();
+}
+
 document.addEventListener('click', e=>{
   const a = e.target.closest('[data-view]');
-  if(a){ e.preventDefault(); showView(a.dataset.view); }
+  if(!a) return;
+  e.preventDefault();
+  // ナビメニュー or トップ画面のカードからシミュレーターをクリック → 入力データをリセット
+  // （物件一覧の「編集」ボタンは loadProperty() で別経路のため対象外）
+  const fromNav = a.classList.contains('nav-link') || a.classList.contains('nav-card');
+  if(a.dataset.view === 'simulator' && fromNav){
+    if(confirm('シミュレーターを新規モードで開きます。現在の入力中データはクリアされます。\n\n（登録済みの物件・APIキーは保持されます）\n\n続行しますか？')){
+      resetSimulatorAndReload();
+      return;
+    } else {
+      return;
+    }
+  }
+  showView(a.dataset.view);
 });
 
 /* =========================================================
