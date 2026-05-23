@@ -1675,14 +1675,51 @@ function extractJson(s){
 }
 
 /* ---------- 国土地理院 ジオコーディング API（住所→緯度経度） ---------- */
+/* 地番形式を住居表示風に正規化（「800番地8」→「8番」など試行錯誤） */
+function normalizeAddressVariants(addr){
+  const variants = [addr]; // 1. 原文
+  // 2. 「○○番地△」→「△番」（地番除去）
+  const m1 = addr.match(/^(.+?[一二三四五六七八九十0-9０-９]+丁目)\d+番地(\d+)/);
+  if(m1) variants.push(`${m1[1]}${m1[2]}番`);
+  // 3. 「○○番地」を削除して丁目までに
+  const m2 = addr.match(/^(.+?[一二三四五六七八九十0-9０-９]+丁目)/);
+  if(m2 && !variants.includes(m2[1])) variants.push(m2[1]);
+  // 4. 全角を半角化
+  const half = addr.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  if(!variants.includes(half)) variants.push(half);
+  return variants;
+}
+
+/* 精度レベル判定（titleから推定） */
+function geocodePrecision(title){
+  if(!title) return { level:0, label:'不明' };
+  if(/[0-9０-９]+番[0-9０-９]+号|[0-9０-９]+-[0-9０-９]+-[0-9０-９]+/.test(title)) return { level:5, label:'番地・号レベル' };
+  if(/[0-9０-９]+番$|[0-9０-９]+番[^地]/.test(title)) return { level:4, label:'街区レベル' };
+  if(/丁目$/.test(title)) return { level:3, label:'丁目レベル' };
+  if(/[市区町村]$/.test(title)) return { level:2, label:'市区町村レベル' };
+  return { level:1, label:'簡易' };
+}
+
 async function geocodeAddress(addr){
-  const url = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(addr);
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('ジオコーディング失敗: '+res.status);
-  const arr = await res.json();
-  if(!arr.length) throw new Error('住所が見つかりません');
-  const [lon, lat] = arr[0].geometry.coordinates;
-  return { lat, lon, title: arr[0].properties.title };
+  const variants = normalizeAddressVariants(addr);
+  let best = null;
+  for(const v of variants){
+    try{
+      const url = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(v);
+      const res = await fetch(url);
+      if(!res.ok) continue;
+      const arr = await res.json();
+      if(!arr.length) continue;
+      const r = arr[0];
+      const [lon, lat] = r.geometry.coordinates;
+      const prec = geocodePrecision(r.properties.title);
+      const candidate = { lat, lon, title: r.properties.title, precision: prec, tried: v };
+      if(!best || prec.level > best.precision.level) best = candidate;
+      if(prec.level >= 4) break; // 街区レベル以上で確定
+    }catch(e){}
+  }
+  if(!best) throw new Error('住所が見つかりません');
+  return best;
 }
 
 /* 緯度経度→XYZタイル座標変換（Web Mercator） */
@@ -1785,7 +1822,9 @@ $('#btnReinfoOfficial').onclick = async ()=>{
 
   try{
     const geo = await geocodeAddress(addr);
-    out.innerHTML = `<div style="color:var(--green);font-size:12px">✅ 座標取得: ${geo.title||addr} (${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)})<div id="reinfoProgress" style="margin-top:4px;font-size:10px;color:var(--sub)">22APIを並列実行中…</div></div>`;
+    const precColor = geo.precision.level >= 4 ? '#10b981' : geo.precision.level >= 3 ? '#f59e0b' : '#ef4444';
+    const precWarn = geo.precision.level < 4 ? '<div style="margin-top:4px;padding:6px 8px;background:rgba(245,158,11,0.1);border-radius:6px;font-size:10px;color:#f59e0b">⚠ 住所精度が丁目レベル以下です。同丁目内でも用途地域が異なる可能性あり。<br>「住居表示」（例：上大崎1-1-1）で再入力すると正確な座標が取得できます。地番（800番地8等）は地理院ジオコーダー対象外です。</div>' : '';
+    out.innerHTML = `<div style="color:var(--green);font-size:12px">✅ 座標取得: ${geo.title||addr} (${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)}) <span style="color:${precColor};font-weight:700">[${geo.precision.label}]</span>${precWarn}<div id="reinfoProgress" style="margin-top:4px;font-size:10px;color:var(--sub)">22APIを並列実行中…</div></div>`;
     const results = await fetchAllOfficial(geo.lat, geo.lon, (done, total, name)=>{
       const p = $('#reinfoProgress');
       if(p) p.innerHTML = `🔄 ${done}/${total} 完了 (${name})`;
@@ -1845,12 +1884,12 @@ const REINFO_API_LIST = [
 
 /* API別の最適zoomレベル（実APIの対応zoomを考慮） */
 const ZOOM_BY_API = {
-  // 施設系（中広範囲）— zoom=12は約10km四方
+  // 施設系（中広範囲）
   XKT004:13, XKT005:13, XKT006:13, XKT007:13,
   XKT010:13, XKT011:13, XKT015:13, XKT017:13,
   XKT018:13, XKT019:13, XPT002:13,
-  // 法規制系（精密）
-  XKT002:14, XKT001:14, XKT014:14, XKT023:14, XKT024:14, XKT030:14, XKT003:14,
+  // 法規制系（最高精密 = zoom15 で番地レベルの正確な区域判定）
+  XKT002:15, XKT001:15, XKT014:15, XKT023:15, XKT024:15, XKT030:15, XKT003:15,
   // 防災系
   XKT016:13, XKT020:13, XKT021:13, XKT022:13, XKT025:13,
   XKT026:13, XKT027:13, XKT028:13, XKT029:13,
