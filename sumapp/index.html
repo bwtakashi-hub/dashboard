@@ -272,24 +272,24 @@
   .pdf-kpi .l{font-size:9px;color:#64748b;letter-spacing:.05em}
   .pdf-kpi .v{font-size:14px;font-weight:800;color:#0a1226;font-family:Inter;margin-top:2px}
 
-  /* ===== 物件概要書 (A4縦) ===== */
-  .gaiyou-sheet{width:210mm;min-height:297mm;background:#fff;color:#1a1a2e;padding:14mm 14mm;font-family:"Noto Sans JP",sans-serif;font-size:10pt;line-height:1.5;margin:0 auto;box-sizing:border-box}
-  .g-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0a1226;padding-bottom:6px;margin-bottom:10px}
-  .g-corp-name{font-size:13pt;font-weight:900;color:#0a1226;letter-spacing:.05em}
-  .g-corp-sub{font-size:8pt;color:#64748b;letter-spacing:.15em}
-  .g-title{font-size:18pt;font-weight:900;letter-spacing:.4em;color:#0a1226}
-  .g-date{font-size:9pt;color:#64748b}
-  .g-title-box{font-size:16pt;font-weight:900;color:#0a1226;background:#eff6ff;padding:8px 14px;border-left:5px solid #0ea5e9;margin:10px 0 4px}
-  .g-addr-box{font-size:10pt;color:#475569;padding:4px 14px 10px}
-  .g-section-title{font-size:11pt;font-weight:700;color:#0a1226;border-left:4px solid #0ea5e9;padding-left:8px;margin:10px 0 4px}
-  .g-table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:4px}
-  .g-table th,.g-table td{border:1px solid #cbd5e1;padding:5px 8px;text-align:left;vertical-align:top}
-  .g-table th{background:#f1f5f9;font-weight:600;color:#475569;width:22%}
+  /* ===== 物件概要書 (A4縦・1ページ最適化) ===== */
+  .gaiyou-sheet{width:210mm;min-height:297mm;background:#fff;color:#1a1a2e;padding:8mm 10mm;font-family:"Noto Sans JP",sans-serif;font-size:8.5pt;line-height:1.35;margin:0 auto;box-sizing:border-box}
+  .g-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0a1226;padding-bottom:3px;margin-bottom:5px}
+  .g-corp-name{font-size:11pt;font-weight:900;color:#0a1226;letter-spacing:.05em}
+  .g-corp-sub{font-size:7pt;color:#64748b;letter-spacing:.15em}
+  .g-title{font-size:14pt;font-weight:900;letter-spacing:.3em;color:#0a1226}
+  .g-date{font-size:8pt;color:#64748b}
+  .g-title-box{font-size:13pt;font-weight:900;color:#0a1226;background:#eff6ff;padding:5px 10px;border-left:4px solid #0ea5e9;margin:5px 0 2px}
+  .g-addr-box{font-size:9pt;color:#475569;padding:3px 10px 6px}
+  .g-section-title{font-size:9.5pt;font-weight:700;color:#0a1226;border-left:3px solid #0ea5e9;padding-left:6px;margin:5px 0 2px}
+  .g-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:2px}
+  .g-table th,.g-table td{border:1px solid #cbd5e1;padding:2px 6px;text-align:left;vertical-align:top}
+  .g-table th{background:#f1f5f9;font-weight:600;color:#475569;width:14%;white-space:nowrap}
   .g-table td.r{text-align:right;font-variant-numeric:tabular-nums}
-  .g-table .g-price{font-size:13pt;font-weight:900;color:#0ea5e9}
+  .g-table .g-price{font-size:11pt;font-weight:900;color:#0ea5e9}
   .g-table .g-price-mini{font-weight:800;color:#10b981}
   .g-table tr.g-total td{background:#eff6ff;font-weight:800;color:#0a1226;border-top:2px solid #0ea5e9}
-  .g-foot{margin-top:14px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8pt;color:#64748b;line-height:1.6;text-align:center}
+  .g-foot{margin-top:5px;padding-top:3px;border-top:1px solid #cbd5e1;font-size:7pt;color:#64748b;line-height:1.5;text-align:center}
   .g-edit{display:inline-block;min-width:30px;padding:1px 4px;border-radius:3px;cursor:text;transition:background .15s;outline:none}
   .g-edit:hover{background:#fef9c3}
   .g-edit:focus{background:#fef08a;box-shadow:inset 0 0 0 1px #f59e0b}
@@ -3956,14 +3956,29 @@ function buildGaiyouHTML(p){
   const curYield = salePrice > 0 ? (curRent / salePrice * 100) : 0;
   const ed = (key, val, type='text') => `<span class="g-edit" data-key="${key}" data-type="${type}" contenteditable="true" spellcheck="false">${val==null||val===''?'—':val}</span>`;
 
-  // 22API結果からポイント情報抽出ヘルパ
+  // 22API結果からポイント情報抽出ヘルパ（フィールド名を網羅的にフォールバック）
   function nearest(id, nameKey){
     const r2 = rf[id]; if(!r2 || !r2.nearest || !r2.nearest.length) return null;
     const n0 = r2.nearest[0];
     if(!n0 || !n0.props) return null;
-    const name = n0.props[nameKey] || n0.props.station_name_ja || n0.props.facility_name_ja || n0.props.name_ja || n0.props.name || n0.props.title || '—';
+    const p = n0.props;
+    // 駅名/施設名候補（XKT015 駅は station_g_name_ja, station_name_ja, station_name 等）
+    const nameKeys = [nameKey, 'station_g_name_ja', 'station_name_ja', 'station_name',
+                      'facility_name_ja', 'facility_name', 'name_ja', 'name',
+                      'school_name_ja', 'school_name', 'shop_name_ja',
+                      'institution_name_ja', 'title', 'title_ja'].filter(Boolean);
+    let name = '—';
+    for(const k of nameKeys){ if(p[k] != null && p[k] !== ''){ name = String(p[k]); break; } }
+    // 路線名（駅の場合）
+    const lineKeys = ['line_name_ja','operation_company_ja','company_name_ja','railway_line_name_ja'];
+    let line = '';
+    for(const k of lineKeys){ if(p[k]){ line = String(p[k]); break; } }
+    // 乗降客数（最新年度を優先）
+    const paxKeys = Object.keys(p).filter(k=>/passenger_volume/i.test(k)).sort().reverse();
+    const pax = paxKeys.length ? p[paxKeys[0]] : '';
+    const extra = pax || p.land_price_ja || p.price_ja || '';
     const dist = typeof n0.distance === 'number' ? n0.distance.toFixed(2)+' km' : '—';
-    return { name, distance: dist, extra: n0.props.passenger_volume_2022_ja || n0.props.land_price_ja || '' };
+    return { name, line, distance: dist, extra };
   }
   function polyFirst(id, key){
     const r2 = rf[id]; if(!r2 || !r2.hits || !r2.hits.length) return null;
@@ -3988,7 +4003,7 @@ function buildGaiyouHTML(p){
 
   // 公式API（XKT015）のみ信頼。古いAI推定データは使わない（住所変更後の旧情報残存を防ぐ）
   const transitText = eki
-    ? `${eki.name}　徒歩 約${Math.ceil(parseFloat(eki.distance)*1000/80)}分（直線 ${eki.distance}）`
+    ? `${eki.line?eki.line+' ':''}${eki.name}駅　徒歩 約${Math.ceil(parseFloat(eki.distance)*1000/80)}分（直線 ${eki.distance}）${eki.extra?'　乗降客 '+eki.extra:''}`
     : '（公式API未取得：STEP1の「📡 公式データ一括取得」を実行してください）';
 
   return `
@@ -4013,36 +4028,49 @@ function buildGaiyouHTML(p){
       <tr><th>物件種別</th><td>${ed('shubetsu', ov.shubetsu ?? ('一棟'+(b.units<=4?'アパート':'マンション')))}</td><th>取引態様</th><td>${ed('taiyou', ov.taiyou ?? '専任媒介')}</td></tr>
       <tr><th>代表構造</th><td>${ed('struct', ov.struct ?? b.struct)}</td><th>築年</th><td>${ed('yearAge', ov.yearAge ?? (b.year?b.year+'年（築'+age+'年）':''))}</td></tr>
       <tr><th>総戸数</th><td>${ed('units', ov.units ?? (b.units+'戸'))}</td><th>現況</th><td>${ed('status', ov.status ?? (b.status+'（'+occupied+'/'+total+'戸入居）'))}</td></tr>
-      <tr><th>駐車場</th><td>${ed('parking', ov.parking ?? ((b.park||0)+'台'))}</td><th>駐車料金</th><td>${ed('parkFee', ov.parkFee ?? (fy(b.parkFee)+' /月・台'))}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ 面積（公簿）</div>
-    <table class="g-table">
-      <tr><th>土地面積（合計）</th><td>${ed('landArea', ov.landArea ?? ((b.land||0).toFixed(2)+' ㎡'))}</td><th>土地坪換算</th><td>${ed('landTsubo', ov.landTsubo ?? (((b.land||0)*0.3025).toFixed(2)+' 坪'))}</td></tr>
-      <tr><th>建物延床（合計）</th><td>${ed('floorArea', ov.floorArea ?? ((b.floor||0).toFixed(2)+' ㎡'))}</td><th>建物坪換算</th><td>${ed('floorTsubo', ov.floorTsubo ?? (((b.floor||0)*0.3025).toFixed(2)+' 坪'))}</td></tr>
-      <tr><th>面積種別</th><td colspan="3" style="font-size:9pt;color:#64748b">${ed('areaType', ov.areaType ?? '※公簿面積を記載。実測は手入力で更新可能')}</td></tr>
+      <tr><th>駐車場</th><td>${ed('parking', ov.parking ?? ((b.park||0)+'台 '+fy(b.parkFee)+'/月'))}</td><th>建物延床合計</th><td>${ed('floorArea', ov.floorArea ?? ((b.floor||0).toFixed(2)+' ㎡（'+((b.floor||0)*0.3025).toFixed(2)+'坪）'))}</td></tr>
     </table>
 
     ${(b.lands||[]).length ? `
-    <div class="g-section-title">▼ 土地明細（${b.lands.length}筆）</div>
+    <div class="g-section-title">▼ 土地明細（${b.lands.length}筆／合計 ${(b.land||0).toFixed(2)}㎡）</div>
     <table class="g-table">
-      <tr><th>地番</th><th>地目</th><th>面積（㎡）</th><th>備考</th></tr>
-      ${b.lands.map(l=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="r">${(l.area||0).toFixed(2)}</td><td>${l.note||''}</td></tr>`).join('')}
-      <tr class="g-total"><td colspan="2">合計</td><td class="r">${(b.land||0).toFixed(2)}</td><td></td></tr>
+      <tr><th>地番</th><th>地目</th><th>公簿面積（㎡）</th><th>実測面積（㎡）</th><th>備考</th></tr>
+      ${b.lands.map((l,i)=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="r">${(l.area||0).toFixed(2)}</td><td class="r">${ed('landReal'+i, ov['landReal'+i] ?? '—')}</td><td>${l.note||''}</td></tr>`).join('')}
+      <tr class="g-total"><td colspan="2">合計</td><td class="r">${(b.land||0).toFixed(2)}</td><td class="r">${ed('landRealSum', ov.landRealSum ?? '—')}</td><td style="font-size:8pt;color:#64748b">公簿＝謄本／実測＝確定測量図</td></tr>
     </table>` : ''}
 
     ${(b.buildings||[]).length ? `
     <div class="g-section-title">▼ 建物明細（${b.buildings.length}棟）</div>
     <table class="g-table">
       <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床（㎡）</th><th>備考</th></tr>
-      ${b.buildings.map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="r">${bb.year||'—'}</td><td class="r">${(bb.floor||0).toFixed(2)}</td><td>${bb.note||'構造 / 物件種別 / 面積（公簿に記載し実測は手入力）'}</td></tr>`).join('')}
+      ${b.buildings.map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="r">${bb.year||'—'}</td><td class="r">${(bb.floor||0).toFixed(2)}</td><td style="font-size:8pt">${bb.note||'構造 / 物件種別 / 面積（公簿）'}</td></tr>`).join('')}
       <tr class="g-total"><td colspan="3">合計</td><td class="r">${(b.floor||0).toFixed(2)}</td><td>総戸数 ${b.units}戸</td></tr>
     </table>` : ''}
+
+    <div class="g-section-title">▼ 法令の制限</div>
+    <table class="g-table">
+      <tr><th>用途地域</th><td>${ed('youto', ov.youto ?? (polyFirst('XKT002','use_area_ja') || a.youto_chiiki))}</td><th>建ぺい/容積</th><td>${ed('kenyo', ov.kenyo ?? ((polyFirst('XKT002','u_building_coverage_ratio_ja') || a.kenpei || '—') + ' / ' + (polyFirst('XKT002','u_floor_area_ratio_ja') || a.yoseki || '—')))}</td></tr>
+      <tr><th>都市計画区域</th><td>${ed('toshi', ov.toshi ?? (polyAny('XKT001') || a.toshi_keikaku))}</td><th>防火地域</th><td>${ed('boukaku', ov.boukaku ?? (polyAny('XKT014') || a.boukaku))}</td></tr>
+      <tr><th>高度地区</th><td>${ed('koudo', ov.koudo ?? (a.koudo || '指定なし'))}</td><th>地区計画</th><td>${ed('chiku', ov.chiku ?? (polyAny('XKT023') || '指定なし'))}</td></tr>
+      <tr><th>都市計画道路</th><td colspan="3">${ed('toshiRoad', ov.toshiRoad ?? (polyAny('XKT030') || '指定なし'))}</td></tr>
+    </table>
+
+    <div class="g-section-title">▼ インフラ・接道</div>
+    <table class="g-table">
+      <tr><th>電気</th><td>${ed('denki', ov.denki ?? '—')}</td><th>ガス</th><td>${ed('gas', ov.gas ?? '—')}</td></tr>
+      <tr><th>上水道</th><td>${ed('suidou', ov.suidou ?? '—')}</td><th>下水道</th><td>${ed('gesui', ov.gesui ?? '—')}</td></tr>
+      <tr><th>接道状況</th><td colspan="3">${ed('douro', ov.douro ?? '—')}</td></tr>
+    </table>
+
+    <div class="g-section-title">▼ 地域条例・規制（AI推定）</div>
+    <table class="g-table">
+      <tr><td colspan="4" style="font-size:9pt;line-height:1.6">${ed('kisei', ov.kisei ?? ((a.kisei && a.kisei.length)? a.kisei.map(k=>'・'+k).join('　') : '（STEP1の「🤖 AI推定（補完情報）」を実行してください）'))}<br><span style="font-size:8pt;color:#64748b">※ AI推定値。正確な情報は自治体HP（都市計画課・建築指導課）でご確認ください</span></td></tr>
+    </table>
 
     <div class="g-section-title">▼ 販売価格・収益サマリー</div>
     <table class="g-table">
       <tr>
-        <th>販売価格（手入力）</th>
+        <th>販売価格</th>
         <td class="g-price"><span class="g-edit g-edit-price" data-key="salePrice" data-type="money" contenteditable="true" spellcheck="false">${salePrice>0?fy(salePrice):'—'}</span></td>
         <th>表面利回り</th>
         <td class="g-price-mini" id="gaiyouYieldCell">${saleYield>0?saleYield.toFixed(2)+'%':'—'}</td>
@@ -4061,54 +4089,9 @@ function buildGaiyouHTML(p){
       </tr>
     </table>
 
-    <div class="g-section-title">▼ 法規制</div>
-    <table class="g-table">
-      <tr><th>用途地域</th><td>${ed('youto', ov.youto ?? (polyFirst('XKT002','use_area_ja') || a.youto_chiiki))}</td><th>建ぺい率</th><td>${ed('kenpei', ov.kenpei ?? (polyFirst('XKT002','u_building_coverage_ratio_ja') || a.kenpei))}</td></tr>
-      <tr><th>容積率</th><td>${ed('yoseki', ov.yoseki ?? (polyFirst('XKT002','u_floor_area_ratio_ja') || a.yoseki))}</td><th>都市計画区域</th><td>${ed('toshi', ov.toshi ?? (polyAny('XKT001') || a.toshi_keikaku))}</td></tr>
-      <tr><th>防火地域</th><td>${ed('boukaku', ov.boukaku ?? (polyAny('XKT014') || a.boukaku))}</td><th>高度地区</th><td>${ed('koudo', ov.koudo ?? (a.koudo || '指定なし'))}</td></tr>
-      <tr><th>地区計画</th><td>${ed('chiku', ov.chiku ?? (polyAny('XKT023') || '指定なし'))}</td><th>高度利用地区</th><td>${ed('koudoRiyou', ov.koudoRiyou ?? (polyAny('XKT024') || '指定なし'))}</td></tr>
-      <tr><th>都市計画道路</th><td colspan="3">${ed('toshiRoad', ov.toshiRoad ?? (polyAny('XKT030') || '指定なし'))}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ インフラ・接道</div>
-    <table class="g-table">
-      <tr><th>電気</th><td>${ed('denki', ov.denki ?? '—')}</td><th>ガス</th><td>${ed('gas', ov.gas ?? '—')}</td></tr>
-      <tr><th>上水道</th><td>${ed('suidou', ov.suidou ?? '—')}</td><th>下水道</th><td>${ed('gesui', ov.gesui ?? '—')}</td></tr>
-      <tr><th>接道状況</th><td colspan="3">${ed('douro', ov.douro ?? '—')}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ 周辺施設（公式API取得値）</div>
-    <table class="g-table">
-      <tr><th>最寄駅</th><td colspan="3">${ed('eki', ov.eki ?? (eki ? `${eki.name}　${eki.distance}${eki.extra?'　乗降客 '+eki.extra:''}` : '—'))}</td></tr>
-      <tr><th>地価公示（最寄）</th><td colspan="3">${ed('chika', ov.chika ?? (chika ? `${chika.name}　${chika.distance}　${chika.extra||''}` : '—'))}</td></tr>
-      <tr><th>小学校（最寄）</th><td>${ed('sho', ov.sho ?? (sho ? `${sho.name}　${sho.distance}` : '—'))}</td><th>医療機関（最寄）</th><td>${ed('iryou', ov.iryou ?? (iryou ? `${iryou.name}　${iryou.distance}` : '—'))}</td></tr>
-      <tr><th>保育園・幼稚園</th><td>${ed('hoiku', ov.hoiku ?? (hoiku ? `${hoiku.name}　${hoiku.distance}` : '—'))}</td><th>小学校区</th><td>${ed('shoKu', ov.shoKu ?? (polyAny('XKT004')||'—'))}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ 地域条例・規制（AI推定）</div>
-    <table class="g-table">
-      <tr><th style="width:22%">該当条例</th><td colspan="3">${ed('kisei', ov.kisei ?? ((a.kisei && a.kisei.length)? a.kisei.map(k=>'・'+k).join('<br>') : '（STEP1の「🤖 AI推定（補完情報）」を実行してください）'))}</td></tr>
-      <tr><th>確認方法</th><td colspan="3" style="font-size:9pt;color:#64748b">${ed('kiseiCheck', ov.kiseiCheck ?? '※ AI推定値です。正確な情報は自治体HP（都市計画課・建築指導課）でご確認ください')}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ 災害リスク</div>
-    <table class="g-table">
-      <tr><th>洪水浸水想定</th><td>${ed('kouzui', ov.kouzui ?? (polyAny('XKT026') || '想定区域外'))}</td><th>津波浸水想定</th><td>${ed('tsunami', ov.tsunami ?? (polyAny('XKT028') || '想定区域外'))}</td></tr>
-      <tr><th>高潮浸水想定</th><td>${ed('takashio', ov.takashio ?? (polyAny('XKT027') || '想定区域外'))}</td><th>土砂災害警戒区域</th><td>${ed('dosha', ov.dosha ?? (polyAny('XKT029') || '指定区域外'))}</td></tr>
-      <tr><th>液状化発生傾向</th><td>${ed('ekijouka', ov.ekijouka ?? (polyAny('XKT025') || '区域外'))}</td><th>急傾斜地崩壊</th><td>${ed('kyukei', ov.kyukei ?? (polyAny('XKT022') || '指定区域外'))}</td></tr>
-      <tr><th>地すべり防止区域</th><td>${ed('jisuberi', ov.jisuberi ?? (polyAny('XKT021') || '指定区域外'))}</td><th>大規模盛土</th><td>${ed('moridoshi', ov.moridoshi ?? (polyAny('XKT020') || '区域外'))}</td></tr>
-      <tr><th>災害危険区域</th><td colspan="3">${ed('saigaiKiken', ov.saigaiKiken ?? (polyAny('XKT016') || '指定区域外'))}</td></tr>
-    </table>
-
-    <div class="g-section-title">▼ 年間収支</div>
-    <table class="g-table">
-      <tr><th>満室想定賃料（GPI）</th><td class="r">${fy(annualRent)}</td><th>NOI（純営業収益）</th><td class="r g-price-mini">${fy(r.NOI||0)}</td></tr>
-      <tr><th>OPEX（年間経費）</th><td class="r">▲ ${fy(r.OPEX||0)}</td><th>空室損失</th><td class="r">▲ ${fy(r.vacancyLoss||0)}</td></tr>
-    </table>
-
     <div class="g-section-title">▼ 備考</div>
     <table class="g-table">
-      <tr><td colspan="4">${ed('memo', ov.memo ?? '販売価格は手入力（円単位）。表面利回り＝年間家賃÷販売価格で自動算出。法規制・周辺施設・災害リスクは国交省 不動産情報ライブラリ公式データ。')}</td></tr>
+      <tr><td colspan="4" style="height:110px;vertical-align:top;line-height:1.8">${ed('memo', ov.memo ?? '・\n・\n・\n・\n・\n・\n・')}</td></tr>
     </table>
 
     <div class="g-foot">
