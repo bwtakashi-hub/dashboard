@@ -1691,13 +1691,14 @@ function latLon2tile(lat, lon, zoom){
    それ以外は直接APIキーとして呼ぶ（ローカル file://環境などで動作）
 */
 async function fetchReinfoZoning(lat, lon){
-  if(!STATE.reinfoKey) throw new Error('不動産情報ライブラリAPIキー（またはGASプロキシURL）未設定');
+  if(!STATE.reinfoKey) throw new Error('不動産情報ライブラリAPIキー（またはGASプロキシURL?key=...）未設定');
   const zoom = 13;
   const t = latLon2tile(lat, lon, zoom);
   let res;
   if(/^https?:\/\//.test(STATE.reinfoKey)){
-    // GASプロキシURL経由
-    const proxyUrl = STATE.reinfoKey.replace(/\?.*$/,'') + `?api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
+    // GASプロキシURL経由（URL内に ?key=... を含む形式）
+    const sep = STATE.reinfoKey.includes('?') ? '&' : '?';
+    const proxyUrl = STATE.reinfoKey + `${sep}api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
     res = await fetch(proxyUrl);
   } else {
     // 直接呼び出し（CORS失敗の可能性大）
@@ -1707,6 +1708,11 @@ async function fetchReinfoZoning(lat, lon){
   if(!res.ok){
     const txt = await res.text();
     throw new Error(`不動産Lib API ${res.status}: ${txt.slice(0,200)}`);
+  }
+  // GASプロキシ経由はHTMLログイン画面を返すことがある（ANYONE_ANONYMOUS未設定時）
+  const ctype = res.headers.get('content-type') || '';
+  if(ctype.includes('html')){
+    throw new Error('GASプロキシが「全員アクセス可」になっていません。デプロイ管理から「アクセスできるユーザー: 全員」に変更してください。');
   }
   const geo = await res.json();
   if(geo.error) throw new Error('プロキシエラー: '+geo.error);
