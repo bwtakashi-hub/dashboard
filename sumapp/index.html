@@ -1971,15 +1971,19 @@ function renderOfficialResults(results){
         <div style="font-size:11px;color:#ef4444;margin-top:2px">❌ ${api.error.slice(0,40)}</div>
       </div>`;
     }
-    if(api.empty || (api.type==='polygon' && (!api.hits || !api.hits.length))){
+    // 空判定（polygon/point両対応）
+    const polyEmpty = api.type==='polygon' && (!api.hits || !api.hits.length);
+    const pointEmpty = api.type==='point' && (!api.nearest || !api.nearest.length);
+    if(api.empty || polyEmpty || pointEmpty){
       return `<div style="${baseStyle}">
         <div style="font-size:10px;color:var(--sub);letter-spacing:.05em">${api.name}</div>
-        <div style="font-size:11px;color:#10b981;margin-top:2px">✓ 該当区域外</div>
+        <div style="font-size:11px;color:#10b981;margin-top:2px">✓ ${api.type==='polygon'?'該当区域外':'周辺データなし'}</div>
       </div>`;
     }
     if(api.type === 'polygon'){
       const v = api.hits[0];
-      const main = Object.keys(v).filter(k=>!k.startsWith('_')&&typeof v[k]!=='object'&&v[k])
+      if(!v) return `<div style="${baseStyle}"><div style="font-size:10px;color:var(--sub)">${api.name}</div><div style="font-size:11px;color:#10b981">✓ 該当区域外</div></div>`;
+      const main = Object.keys(v).filter(k=>!k.startsWith('_')&&typeof v[k]!=='object'&&v[k]!=null&&v[k]!=='')
         .slice(0,2).map(k=>v[k]).join(' / ');
       return `<div style="${baseStyle};border-color:rgba(14,165,233,0.35);background:rgba(14,165,233,0.06)">
         <div style="font-size:10px;color:var(--sub);letter-spacing:.05em">${api.name}</div>
@@ -1988,12 +1992,14 @@ function renderOfficialResults(results){
     } else {
       // point
       const n0 = api.nearest[0];
+      if(!n0 || !n0.props) return `<div style="${baseStyle}"><div style="font-size:10px;color:var(--sub)">${api.name}</div><div style="font-size:11px;color:#10b981">✓ 周辺データなし</div></div>`;
       const name = n0.props.station_name_ja || n0.props.facility_name_ja || n0.props.name_ja || n0.props.name || n0.props.title || '—';
       const extra = n0.props.passenger_volume_2022_ja || n0.props.land_price_ja || '';
+      const dist = typeof n0.distance === 'number' ? n0.distance.toFixed(2) : '—';
       return `<div style="${baseStyle};border-color:rgba(139,92,246,0.35);background:rgba(139,92,246,0.06)">
         <div style="font-size:10px;color:var(--sub);letter-spacing:.05em">${api.name}</div>
         <div style="font-size:12px;color:var(--text);font-weight:700;margin-top:2px;line-height:1.4">${name}</div>
-        <div style="font-size:10px;color:var(--blue);margin-top:1px">🚶 ${n0.distance.toFixed(2)}km${extra?'　／ '+extra:''}</div>
+        <div style="font-size:10px;color:var(--blue);margin-top:1px">🚶 ${dist}km${extra?'　／ '+extra:''}</div>
       </div>`;
     }
   }
@@ -3863,8 +3869,10 @@ function buildGaiyouHTML(p){
   function nearest(id, nameKey){
     const r2 = rf[id]; if(!r2 || !r2.nearest || !r2.nearest.length) return null;
     const n0 = r2.nearest[0];
+    if(!n0 || !n0.props) return null;
     const name = n0.props[nameKey] || n0.props.station_name_ja || n0.props.facility_name_ja || n0.props.name_ja || n0.props.name || n0.props.title || '—';
-    return { name, distance: n0.distance.toFixed(2)+' km', extra: n0.props.passenger_volume_2022_ja || n0.props.land_price_ja || '' };
+    const dist = typeof n0.distance === 'number' ? n0.distance.toFixed(2)+' km' : '—';
+    return { name, distance: dist, extra: n0.props.passenger_volume_2022_ja || n0.props.land_price_ja || '' };
   }
   function polyFirst(id, key){
     const r2 = rf[id]; if(!r2 || !r2.hits || !r2.hits.length) return null;
