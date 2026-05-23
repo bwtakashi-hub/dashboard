@@ -4101,6 +4101,10 @@ function buildGaiyouHTML(p){
   const age = b.year ? (new Date().getFullYear()-b.year) : 0;
   const today = new Date().toLocaleDateString('ja-JP');
   const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
+  // 「（推定）」「(推定)」「※推定」等を除去（公式APIデータには不要なため）
+  const stripEst = v => v==null ? v : String(v).replace(/[（(\s]*推定[）)]?/g,'').replace(/※\s*推定[^\s、。]*/g,'').trim();
+  // 面積→坪換算併記
+  const m2t = m => (Number(m)||0).toFixed(2)+'㎡（'+((Number(m)||0)*0.3025).toFixed(2)+'坪）';
   const occupied = (s.rentRoll||[]).filter(x=>!x.vacancy).length;
   const total = (s.rentRoll||[]).length;
   const monthly = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
@@ -4187,27 +4191,27 @@ function buildGaiyouHTML(p){
     </table>
 
     ${(b.lands||[]).length ? `
-    <div class="g-section-title">▼ 土地明細（${b.lands.length}筆／合計 ${(b.land||0).toFixed(2)}㎡）</div>
+    <div class="g-section-title">▼ 土地明細（${b.lands.length}筆／合計 ${m2t(b.land||0)}）</div>
     <table class="g-table">
-      <tr><th>地番</th><th>地目</th><th>公簿面積（㎡）</th><th>実測面積（㎡）</th><th>備考</th></tr>
-      ${b.lands.map((l,i)=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="r">${(l.area||0).toFixed(2)}</td><td class="r">${ed('landReal'+i, ov['landReal'+i] ?? '—')}</td><td>${l.note||''}</td></tr>`).join('')}
-      <tr class="g-total"><td colspan="2">合計</td><td class="r">${(b.land||0).toFixed(2)}</td><td class="r">${ed('landRealSum', ov.landRealSum ?? '—')}</td><td style="font-size:8pt;color:#64748b">公簿＝謄本／実測＝確定測量図</td></tr>
+      <tr><th>地番</th><th>地目</th><th>公簿面積</th><th>実測面積</th><th>備考</th></tr>
+      ${b.lands.map((l,i)=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="r">${m2t(l.area||0)}</td><td class="r">${ed('landReal'+i, ov['landReal'+i] ?? '—')}</td><td>${l.note||''}</td></tr>`).join('')}
+      <tr class="g-total"><td colspan="2">合計</td><td class="r">${m2t(b.land||0)}</td><td class="r">${ed('landRealSum', ov.landRealSum ?? '—')}</td><td style="font-size:7pt;color:#64748b">公簿＝謄本／実測＝確定測量図</td></tr>
     </table>` : ''}
 
     ${(b.buildings||[]).length ? `
     <div class="g-section-title">▼ 建物明細（${b.buildings.length}棟）</div>
     <table class="g-table">
-      <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床（㎡）</th><th>備考</th></tr>
-      ${b.buildings.map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="r">${bb.year||'—'}</td><td class="r">${(bb.floor||0).toFixed(2)}</td><td style="font-size:8pt">${bb.note||'構造 / 物件種別 / 面積（公簿）'}</td></tr>`).join('')}
-      <tr class="g-total"><td colspan="3">合計</td><td class="r">${(b.floor||0).toFixed(2)}</td><td>総戸数 ${b.units}戸</td></tr>
+      <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床面積</th><th>備考</th></tr>
+      ${b.buildings.map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="r">${bb.year||'—'}</td><td class="r">${m2t(bb.floor||0)}</td><td style="font-size:7.5pt">${bb.note||'構造 / 物件種別 / 面積（公簿）'}</td></tr>`).join('')}
+      <tr class="g-total"><td colspan="3">合計</td><td class="r">${m2t(b.floor||0)}</td><td>総戸数 ${b.units}戸</td></tr>
     </table>` : ''}
 
     <div class="g-section-title">▼ 法令の制限</div>
     <table class="g-table">
-      <tr><th>用途地域</th><td>${ed('youto', ov.youto ?? (polyFirst('XKT002','use_area_ja') || a.youto_chiiki))}</td><th>建ぺい/容積</th><td>${ed('kenyo', ov.kenyo ?? ((polyFirst('XKT002','u_building_coverage_ratio_ja') || a.kenpei || '—') + ' / ' + (polyFirst('XKT002','u_floor_area_ratio_ja') || a.yoseki || '—')))}</td></tr>
-      <tr><th>都市計画区域</th><td>${ed('toshi', ov.toshi ?? (polyAny('XKT001') || a.toshi_keikaku))}</td><th>防火地域</th><td>${ed('boukaku', ov.boukaku ?? (polyAny('XKT014') || a.boukaku))}</td></tr>
-      <tr><th>高度地区</th><td>${ed('koudo', ov.koudo ?? (a.koudo || '指定なし'))}</td><th>地区計画</th><td>${ed('chiku', ov.chiku ?? (polyAny('XKT023') || '指定なし'))}</td></tr>
-      <tr><th>都市計画道路</th><td colspan="3">${ed('toshiRoad', ov.toshiRoad ?? (polyAny('XKT030') || '指定なし'))}</td></tr>
+      <tr><th>用途地域</th><td>${ed('youto', stripEst(ov.youto ?? (polyFirst('XKT002','use_area_ja') || a.youto_chiiki)))}</td><th>建ぺい/容積</th><td>${ed('kenyo', stripEst(ov.kenyo ?? ((polyFirst('XKT002','u_building_coverage_ratio_ja') || a.kenpei || '—') + ' / ' + (polyFirst('XKT002','u_floor_area_ratio_ja') || a.yoseki || '—'))))}</td></tr>
+      <tr><th>都市計画区域</th><td>${ed('toshi', stripEst(ov.toshi ?? (polyAny('XKT001') || a.toshi_keikaku)))}</td><th>防火地域</th><td>${ed('boukaku', stripEst(ov.boukaku ?? (polyAny('XKT014') || a.boukaku)))}</td></tr>
+      <tr><th>高度地区</th><td>${ed('koudo', stripEst(ov.koudo ?? (a.koudo || '指定なし')))}</td><th>地区計画</th><td>${ed('chiku', stripEst(ov.chiku ?? (polyAny('XKT023') || '指定なし')))}</td></tr>
+      <tr><th>都市計画道路</th><td colspan="3">${ed('toshiRoad', stripEst(ov.toshiRoad ?? (polyAny('XKT030') || '指定なし')))}</td></tr>
     </table>
 
     <div class="g-section-title">▼ インフラ・接道</div>
