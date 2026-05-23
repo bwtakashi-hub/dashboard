@@ -3830,8 +3830,8 @@ function buildGaiyouHTML(p){
   const addr = ov.addr ?? `${b.pref||''}${b.city||''}${b.addr||''}`;
   const age = b.year ? (new Date().getFullYear()-b.year) : 0;
   const today = new Date().toLocaleDateString('ja-JP');
+  // 円表記に統一（カンマ区切り + ¥ + 円）
   const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
-  const fm = n => { const v = (Number(n)||0)/10000; return v >= 10000 ? (v/10000).toFixed(2)+'億円' : v.toFixed(0)+'万円'; };
   const occupied = (s.rentRoll||[]).filter(x=>!x.vacancy).length;
   const total = (s.rentRoll||[]).length;
   const monthly = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
@@ -3890,19 +3890,19 @@ function buildGaiyouHTML(p){
     <table class="g-table">
       <tr>
         <th>販売価格（手入力）</th>
-        <td class="g-price"><span class="g-edit g-edit-price" data-key="salePrice" data-type="money" contenteditable="true" spellcheck="false">${salePrice>0?fm(salePrice):'—'}</span></td>
+        <td class="g-price"><span class="g-edit g-edit-price" data-key="salePrice" data-type="money" contenteditable="true" spellcheck="false">${salePrice>0?fy(salePrice):'—'}</span></td>
         <th>表面利回り（自動算出）</th>
         <td class="g-price-mini" id="gaiyouYieldCell">${saleYield>0?saleYield.toFixed(2)+'%':'—'}</td>
       </tr>
       <tr>
         <th>満室想定 年収（GPI）</th>
         <td class="r">${fy(annualRent)}</td>
-        <th>現況利回り</th>
-        <td>${salePrice>0?((((s.rentRoll||[]).filter(x=>!x.vacancy).reduce((sm,x)=>sm+(x.rent||0)+(x.mgmt||0),0))*12)/salePrice*100).toFixed(2)+'%':'—'}</td>
+        <th>現況利回り（自動算出）</th>
+        <td id="gaiyouCurYieldCell">${salePrice>0?((((s.rentRoll||[]).filter(x=>!x.vacancy).reduce((sm,x)=>sm+(x.rent||0)+(x.mgmt||0),0))*12)/salePrice*100).toFixed(2)+'%':'—'}</td>
       </tr>
       <tr>
         <th>備考</th>
-        <td colspan="3">${ed('priceNote', ov.priceNote ?? '販売価格は手入力。表面利回りは「年間家賃 ÷ 販売価格」で自動算出。')}</td>
+        <td colspan="3">${ed('priceNote', ov.priceNote ?? '販売価格は手入力（円単位）。表面利回りは「年間家賃 ÷ 販売価格」で自動算出。')}</td>
       </tr>
     </table>
 
@@ -3932,8 +3932,11 @@ function saveGaiyouOverrides(){
     const key = el.dataset.key;
     const type = el.dataset.type;
     let val = el.textContent.trim();
-    if(val === '—') val = '';
-    if(type === 'money'){ val = val.replace(/[^\d]/g,''); val = val ? Number(val) : 0; }
+    if(val === '—' || val === '') { val = ''; }
+    if(type === 'money'){
+      const num = val.replace(/[^\d]/g,'');
+      val = num ? Number(num) : 0;
+    }
     p.snapshot.gaiyouOverride[key] = val;
   });
   savePropertyList(list);
@@ -3943,23 +3946,55 @@ function saveGaiyouOverrides(){
   bindGaiyouEvents();
 }
 
-/* 販売価格入力時の表面利回り即時再計算 */
+/* 販売価格入力 - リアルタイム円換算 + 利回り再計算 */
 function bindGaiyouEvents(){
   const priceEl = document.querySelector('.g-edit-price');
   if(!priceEl) return;
+  const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
+
+  // 利回り再計算
   const update = ()=>{
     const sheet = $('.gaiyou-sheet');
     const propId = sheet.dataset.propId;
     const p = getPropertyList().find(x=>x.id===propId);
     if(!p) return;
-    const annual = (p.snapshot.rentRoll||[]).reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
+    const rentRoll = p.snapshot.rentRoll||[];
+    const annualAll = rentRoll.reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
+    const annualCur = rentRoll.filter(x=>!x.vacancy).reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
     const raw = priceEl.textContent.replace(/[^\d]/g,'');
     const price = raw ? Number(raw) : 0;
-    const y = price>0 ? (annual/price*100).toFixed(2)+'%' : '—';
+    const y1 = price>0 ? (annualAll/price*100).toFixed(2)+'%' : '—';
+    const y2 = price>0 ? (annualCur/price*100).toFixed(2)+'%' : '—';
     const yc = $('#gaiyouYieldCell');
-    if(yc) yc.textContent = y;
+    const yc2 = $('#gaiyouCurYieldCell');
+    if(yc) yc.textContent = y1;
+    if(yc2) yc2.textContent = y2;
   };
-  priceEl.addEventListener('input', update);
+
+  // 入力中：数字だけ抜き出してカンマ整形（カーソル位置は末尾固定で簡略化）
+  priceEl.addEventListener('input', ()=>{
+    const raw = priceEl.textContent.replace(/[^\d]/g,'');
+    const formatted = raw ? fy(Number(raw)) : '';
+    if(priceEl.textContent !== formatted){
+      priceEl.textContent = formatted;
+      // カーソルを末尾へ
+      const range = document.createRange();
+      range.selectNodeContents(priceEl);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    update();
+  });
+  priceEl.addEventListener('blur', ()=>{
+    const raw = priceEl.textContent.replace(/[^\d]/g,'');
+    priceEl.textContent = raw ? fy(Number(raw)) : '—';
+    update();
+  });
+  priceEl.addEventListener('focus', ()=>{
+    if(priceEl.textContent === '—') priceEl.textContent = '';
+  });
 }
 
 /* =========================================================
