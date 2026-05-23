@@ -3626,13 +3626,60 @@ function showView(v){
   document.body.classList.toggle('print-gaiyou', v==='gaiyou');
 }
 
-/* シミュレーター完全リセット（APIキー・登録物件は保持） */
-function resetSimulatorAndReload(){
+/* シミュレーターフォームを完全初期化（APIキー・登録物件は保持） */
+function resetSimulatorForm(){
+  // 基本情報
+  ['propName','propZip','propPref','propCity','propAddr'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
+  // テーブル類クリア＋初期行
+  if($('#landBody')){ $('#landBody').innerHTML=''; landAddRow(); }
+  if($('#bldgBody')){ $('#bldgBody').innerHTML=''; bldgAddRow(); }
+  if($('#rrBody')){
+    $('#rrBody').innerHTML='';
+    for(let i=0;i<5;i++) rrAddRow({no:String(101+i), plan:'1K', area:25, rent:55000, mgmt:3000});
+  }
+  // STEP2
+  if($('#propStatus')) $('#propStatus').value = '満室';
+  if($('#propPark')) $('#propPark').value = '';
+  if($('#propParkFee')) $('#propParkFee').value = '';
+  // STEP3 経費（デフォルト値に戻す）
+  if($('#opMgmt'))    $('#opMgmt').value = '5';
+  if($('#opRepair'))  $('#opRepair').value = '';
+  if($('#opTax'))     $('#opTax').value = '';
+  if($('#opIns'))     $('#opIns').value = '';
+  if($('#opEtc'))     $('#opEtc').value = '';
+  if($('#opVacancy')) $('#opVacancy').value = '5';
+  if($('#capMid'))    $('#capMid').value = '8.0';
+  if($('#capMin'))    $('#capMin').value = '7.0';
+  if($('#capMax'))    $('#capMax').value = '9.5';
+  if($('#dcfRate'))   $('#dcfRate').value = '6.0';
+  if($('#rentDrop'))  $('#rentDrop').value = '0.8';
+  if($('#evalName'))  $('#evalName').value = '';
+  if($('#evalComment')) $('#evalComment').value = '';
+  if($('#driveFolderUrl')) $('#driveFolderUrl').value = '';
+  // STATE
+  STATE.basic = {};
+  STATE.rentRoll = [];
+  STATE.expenses = {};
+  STATE.market = null;
+  STATE.areaInfo = null;
+  STATE.futureAI = null;
+  STATE.taxInfo = null;
+  STATE.rrCitations = [];
   STATE.currentPropertyId = '';
+  STATE.result = null;
+  STATE.files = { deed:[], map:[], rr:[], drive:[], exp:[], tax:[] };
+  // ファイルチップ・AI結果表示エリアクリア
+  ['#deedFiles','#mapFiles','#rrFiles','#expFiles','#taxFiles','#driveFiles',
+   '#reinfoResult','#areaInfoResult','#aiResult','#expResult','#taxResult','#webFillResult'].forEach(s=>{
+    const el = $(s); if(el) el.innerHTML='';
+  });
+  $('#aiLoad')?.classList.add('hide');
+  // localStorage（編集中スナップショットのみクリア）
   localStorage.removeItem(CURRENT_ID_KEY);
   localStorage.removeItem('appraisal_snapshot_v1');
-  location.hash = '#simulator';
-  location.reload();
+  // STEP1へ
+  goStep(1);
+  showToast('🆕 新規モードで開始しました','success');
 }
 
 document.addEventListener('click', e=>{
@@ -3644,7 +3691,8 @@ document.addEventListener('click', e=>{
   const fromNav = a.classList.contains('nav-link') || a.classList.contains('nav-card');
   if(a.dataset.view === 'simulator' && fromNav){
     if(confirm('シミュレーターを新規モードで開きます。現在の入力中データはクリアされます。\n\n（登録済みの物件・APIキーは保持されます）\n\n続行しますか？')){
-      resetSimulatorAndReload();
+      showView('simulator');
+      resetSimulatorForm();
       return;
     } else {
       return;
