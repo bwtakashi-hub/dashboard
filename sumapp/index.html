@@ -3686,6 +3686,8 @@ function resetSimulatorForm(){
   });
   // 編集中物件IDだけ消す（snapshotは新規空状態として保存→F5で空が復元される）
   localStorage.removeItem(CURRENT_ID_KEY);
+  // URLハッシュを消す（F5時の混乱防止）
+  if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   // STEP1へ
   goStep(1);
   // 空状態を即保存（F5復元時も空のまま）
