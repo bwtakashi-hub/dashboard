@@ -290,6 +290,11 @@
   .g-table .g-price-mini{font-weight:800;color:#10b981}
   .g-table tr.g-total td{background:#eff6ff;font-weight:800;color:#0a1226;border-top:2px solid #0ea5e9}
   .g-foot{margin-top:14px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8pt;color:#64748b;line-height:1.6;text-align:center}
+  .g-edit{display:inline-block;min-width:30px;padding:1px 4px;border-radius:3px;cursor:text;transition:background .15s;outline:none}
+  .g-edit:hover{background:#fef9c3}
+  .g-edit:focus{background:#fef08a;box-shadow:inset 0 0 0 1px #f59e0b}
+  .g-edit-price{font-size:13pt;font-weight:900;color:#0ea5e9;min-width:140px}
+  @media print{ .g-edit:hover, .g-edit:focus{background:transparent;box-shadow:none} }
 
   @media print{
     @page{size:A4 portrait;margin:0}
@@ -826,14 +831,18 @@
 
   <!-- ===== GAIYOU VIEW (物件概要書 - A4縦印刷専用) ===== -->
   <section class="view view-gaiyou hide">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px" class="no-print">
-      <h2 style="color:var(--text)">📄 物件概要書</h2>
-      <div style="display:flex;gap:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px" class="no-print">
+      <div>
+        <h2 style="color:var(--text);margin:0">📄 物件概要書</h2>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px">セル内をクリックで直接編集可能。「💾 更新を保存」で物件データに反映。</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
-        <button class="btn btn-green" onclick="window.print()">🖨 印刷 / PDF保存</button>
+        <button class="btn btn-primary" id="btnGaiyouSave">💾 更新を保存</button>
+        <button class="btn btn-green" id="btnGaiyouPrint" onclick="window.print()">🖨 A4印刷 / PDF保存</button>
       </div>
     </div>
-    <div id="gaiyouContainer" style="background:#fff;color:#000;padding:0;border-radius:8px"></div>
+    <div id="gaiyouContainer" style="background:#fff;color:#000;padding:0;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.3);overflow:hidden"></div>
   </section>
 
 </div>
@@ -3734,22 +3743,22 @@ function seedAzureMeguro(){
     dcfRate: 6.0, rentDrop: 0.8,
     evalName: '株式会社住まっぷ',
   };
-  // 基本情報
+  // 基本情報（謄本=品川区上大崎ベース）
   const lands = [
-    {chiban:'品川区上大崎1丁目800-8', chimoku:'宅地', area:0, note:'登記上の地番（住居表示: 目黒区緑が丘1-21-1）'},
-    {chiban:'品川区上大崎1丁目800-31', chimoku:'宅地', area:0, note:''},
+    {chiban:'800-8', chimoku:'宅地', area:83.20, note:''},
+    {chiban:'800-31', chimoku:'宅地', area:20.27, note:'平成26年6月24日 800番8から分筆'},
   ];
   const buildings = [
     {name:'アジュール目黒', struct:'木造', year:2015, floor:160.00, note:'1R×8戸'},
   ];
   const basic = {
     name: 'アジュール目黒',
-    zip: '152-0034',
+    zip: '',
     pref: '東京都',
-    city: '目黒区',
-    addr: '緑が丘1-21-1',
+    city: '品川区',
+    addr: '上大崎一丁目800番地8',
     lands, buildings,
-    land: 0,
+    land: 103.47,
     floor: 160.00,
     units: 8,
     struct: '木造',
@@ -3810,11 +3819,15 @@ function openGaiyou(id){
   if(!p){ showToast('物件が見つかりません','error'); return; }
   $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
   showView('gaiyou');
+  setTimeout(bindGaiyouEvents, 50);
 }
+// 保存ボタン
+setTimeout(()=>{ $('#btnGaiyouSave')?.addEventListener('click', saveGaiyouOverrides); }, 300);
 
 function buildGaiyouHTML(p){
-  const s = p.snapshot, b = s.basic||{}, e = s.expenses||{}, r = s.result||{}, m = s.market, a = s.areaInfo;
-  const addr = `${b.pref||''}${b.city||''}${b.addr||''}`;
+  const s = p.snapshot, b = s.basic||{}, e = s.expenses||{}, r = s.result||{}, a = s.areaInfo;
+  const ov = s.gaiyouOverride || {};   // ユーザー編集の上書きデータ
+  const addr = ov.addr ?? `${b.pref||''}${b.city||''}${b.addr||''}`;
   const age = b.year ? (new Date().getFullYear()-b.year) : 0;
   const today = new Date().toLocaleDateString('ja-JP');
   const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
@@ -3822,8 +3835,12 @@ function buildGaiyouHTML(p){
   const occupied = (s.rentRoll||[]).filter(x=>!x.vacancy).length;
   const total = (s.rentRoll||[]).length;
   const monthly = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
+  const annualRent = monthly * 12;
+  const salePrice = ov.salePrice !== undefined ? Number(ov.salePrice)||0 : 0;
+  const saleYield = salePrice > 0 ? (annualRent / salePrice * 100) : 0;
+  const ed = (key, val, type='text') => `<span class="g-edit" data-key="${key}" data-type="${type}" contenteditable="true" spellcheck="false">${val==null||val===''?'—':val}</span>`;
   return `
-  <div class="gaiyou-sheet">
+  <div class="gaiyou-sheet" data-prop-id="${p.id}">
     <div class="g-header">
       <div class="g-corp">
         <div class="g-corp-name">株式会社 住まっぷ</div>
@@ -3833,15 +3850,15 @@ function buildGaiyouHTML(p){
       <div class="g-date">作成日：${today}</div>
     </div>
 
-    <div class="g-title-box">${p.name||'—'}</div>
-    <div class="g-addr-box">所在地：${addr}　／　郵便番号 ${b.zip||'—'}</div>
+    <div class="g-title-box">${ed('name', ov.name ?? p.name)}</div>
+    <div class="g-addr-box">所在地：${ed('addr', addr)}　／　郵便番号 ${ed('zip', ov.zip ?? b.zip ?? '')}</div>
 
     <table class="g-table">
-      <tr><th>物件種別</th><td>一棟${b.units<=4?'アパート':'マンション'}</td><th>取引態様</th><td>—</td></tr>
-      <tr><th>代表構造</th><td>${b.struct||'—'}</td><th>築年（築年数）</th><td>${b.year?b.year+'年（築'+age+'年）':'—'}</td></tr>
-      <tr><th>総戸数</th><td>${b.units}戸</td><th>現況</th><td>${b.status||'—'}（${occupied}/${total}戸入居）</td></tr>
-      <tr><th>土地面積（合計）</th><td>${(b.land||0).toFixed(2)} ㎡（${((b.land||0)*0.3025).toFixed(2)}坪）</td><th>建物延床（合計）</th><td>${(b.floor||0).toFixed(2)} ㎡（${((b.floor||0)*0.3025).toFixed(2)}坪）</td></tr>
-      <tr><th>駐車場</th><td>${b.park||0}台 ／ ${fy(b.parkFee)}/台</td><th>満室想定 月額</th><td>${fy(monthly)}（年額 ${fy(monthly*12)}）</td></tr>
+      <tr><th>物件種別</th><td>${ed('shubetsu', ov.shubetsu ?? ('一棟'+(b.units<=4?'アパート':'マンション')))}</td><th>取引態様</th><td>${ed('taiyou', ov.taiyou ?? '専任媒介')}</td></tr>
+      <tr><th>代表構造</th><td>${ed('struct', ov.struct ?? b.struct)}</td><th>築年（築年数）</th><td>${ed('yearAge', ov.yearAge ?? (b.year?b.year+'年（築'+age+'年）':''))}</td></tr>
+      <tr><th>総戸数</th><td>${ed('units', ov.units ?? (b.units+'戸'))}</td><th>現況</th><td>${ed('status', ov.status ?? (b.status+'（'+occupied+'/'+total+'戸入居）'))}</td></tr>
+      <tr><th>土地面積（合計）</th><td>${ed('landArea', ov.landArea ?? ((b.land||0).toFixed(2)+' ㎡（'+((b.land||0)*0.3025).toFixed(2)+'坪）'))}</td><th>建物延床（合計）</th><td>${ed('floorArea', ov.floorArea ?? ((b.floor||0).toFixed(2)+' ㎡（'+((b.floor||0)*0.3025).toFixed(2)+'坪）'))}</td></tr>
+      <tr><th>駐車場</th><td>${ed('parking', ov.parking ?? ((b.park||0)+'台 ／ '+fy(b.parkFee)+'/台'))}</td><th>満室想定 月額</th><td>${ed('monthly', ov.monthly ?? (fy(monthly)+'（年額 '+fy(annualRent)+'）'))}</td></tr>
     </table>
 
     ${(b.lands||[]).length ? `
@@ -3863,24 +3880,36 @@ function buildGaiyouHTML(p){
     ${a ? `
     <div class="g-section-title">▼ 法規制・インフラ</div>
     <table class="g-table">
-      <tr><th>用途地域</th><td>${a.youto_chiiki||'—'}</td><th>建ぺい/容積</th><td>${a.kenpei||'—'} / ${a.yoseki||'—'}</td></tr>
-      <tr><th>都市計画</th><td>${a.toshi_keikaku||'—'}</td><th>防火地域</th><td>${a.boukaku||'—'}</td></tr>
-      <tr><th>接道</th><td>${a.douro||'—'}</td><th>最寄駅</th><td>${a.transit||'—'}</td></tr>
-      <tr><th>ライフライン</th><td colspan="3">電気: ${a.lifeline?.denki||'—'} / ガス: ${a.lifeline?.gas||'—'} / 上水: ${a.lifeline?.suidou||'—'} / 下水: ${a.lifeline?.gesui||'—'}</td></tr>
+      <tr><th>用途地域</th><td>${ed('youto', ov.youto ?? a.youto_chiiki)}</td><th>建ぺい/容積</th><td>${ed('kenyo', ov.kenyo ?? ((a.kenpei||'—')+' / '+(a.yoseki||'—')))}</td></tr>
+      <tr><th>都市計画</th><td>${ed('toshi', ov.toshi ?? a.toshi_keikaku)}</td><th>防火地域</th><td>${ed('boukaku', ov.boukaku ?? a.boukaku)}</td></tr>
+      <tr><th>接道</th><td>${ed('douro', ov.douro ?? a.douro)}</td><th>最寄駅</th><td>${ed('transit', ov.transit ?? a.transit)}</td></tr>
+      <tr><th>ライフライン</th><td colspan="3">${ed('lifeline', ov.lifeline ?? ('電気: '+(a.lifeline?.denki||'—')+' / ガス: '+(a.lifeline?.gas||'—')+' / 上水: '+(a.lifeline?.suidou||'—')+' / 下水: '+(a.lifeline?.gesui||'—')))}</td></tr>
     </table>` : ''}
 
-    <div class="g-section-title">▼ 収益査定サマリー</div>
+    <div class="g-section-title">▼ 販売価格・収益サマリー</div>
     <table class="g-table">
-      <tr><th>査定価格 中央値</th><td class="g-price">${fm(r.priceMid||0)}</td><th>CAP RATE 中央値</th><td>${(r.capMid||0).toFixed(2)}%</td></tr>
-      <tr><th>上振れ値</th><td>${fm(r.priceUp||0)}（CAP ${(r.capMin||0).toFixed(2)}%）</td><th>下限値</th><td>${fm(r.priceLow||0)}（CAP ${(r.capMax||0).toFixed(2)}%）</td></tr>
-      <tr><th>満室想定 表面利回り</th><td>${(r.grossYield||0).toFixed(2)}%</td><th>NOI利回り</th><td>${(r.noiYield||0).toFixed(2)}%</td></tr>
-      <tr><th>GPI（満室想定年収）</th><td>${fy(r.GPI||0)}</td><th>NOI（純営業収益）</th><td>${fy(r.NOI||0)}</td></tr>
+      <tr>
+        <th>販売価格（手入力）</th>
+        <td class="g-price"><span class="g-edit g-edit-price" data-key="salePrice" data-type="money" contenteditable="true" spellcheck="false">${salePrice>0?fm(salePrice):'—'}</span></td>
+        <th>表面利回り（自動算出）</th>
+        <td class="g-price-mini" id="gaiyouYieldCell">${saleYield>0?saleYield.toFixed(2)+'%':'—'}</td>
+      </tr>
+      <tr>
+        <th>満室想定 年収（GPI）</th>
+        <td class="r">${fy(annualRent)}</td>
+        <th>現況利回り</th>
+        <td>${salePrice>0?((((s.rentRoll||[]).filter(x=>!x.vacancy).reduce((sm,x)=>sm+(x.rent||0)+(x.mgmt||0),0))*12)/salePrice*100).toFixed(2)+'%':'—'}</td>
+      </tr>
+      <tr>
+        <th>備考</th>
+        <td colspan="3">${ed('priceNote', ov.priceNote ?? '販売価格は手入力。表面利回りは「年間家賃 ÷ 販売価格」で自動算出。')}</td>
+      </tr>
     </table>
 
     <div class="g-section-title">▼ 年間収支</div>
     <table class="g-table">
-      <tr><th>GPI</th><td class="r">${fy(r.GPI||0)}</td><th>OPEX</th><td class="r">▲ ${fy(r.OPEX||0)}</td></tr>
-      <tr><th>空室損失</th><td class="r">▲ ${fy(r.vacancyLoss||0)}</td><th>NOI</th><td class="r g-price-mini">${fy(r.NOI||0)}</td></tr>
+      <tr><th>満室想定賃料</th><td class="r">${fy(annualRent)}</td><th>NOI（純営業収益）</th><td class="r g-price-mini">${fy(r.NOI||0)}</td></tr>
+      <tr><th>OPEX（年間経費）</th><td class="r">▲ ${fy(r.OPEX||0)}</td><th>空室損失</th><td class="r">▲ ${fy(r.vacancyLoss||0)}</td></tr>
     </table>
 
     <div class="g-foot">
@@ -3888,6 +3917,49 @@ function buildGaiyouHTML(p){
       株式会社 住まっぷ ／ 作成日 ${today}
     </div>
   </div>`;
+}
+
+/* 概要書の編集→保存 */
+function saveGaiyouOverrides(){
+  const sheet = $('.gaiyou-sheet');
+  if(!sheet) return;
+  const propId = sheet.dataset.propId;
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===propId);
+  if(!p) return;
+  if(!p.snapshot.gaiyouOverride) p.snapshot.gaiyouOverride = {};
+  $$('.g-edit', sheet).forEach(el=>{
+    const key = el.dataset.key;
+    const type = el.dataset.type;
+    let val = el.textContent.trim();
+    if(val === '—') val = '';
+    if(type === 'money'){ val = val.replace(/[^\d]/g,''); val = val ? Number(val) : 0; }
+    p.snapshot.gaiyouOverride[key] = val;
+  });
+  savePropertyList(list);
+  showToast('💾 物件概要書を更新しました','success');
+  // 再描画
+  $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
+  bindGaiyouEvents();
+}
+
+/* 販売価格入力時の表面利回り即時再計算 */
+function bindGaiyouEvents(){
+  const priceEl = document.querySelector('.g-edit-price');
+  if(!priceEl) return;
+  const update = ()=>{
+    const sheet = $('.gaiyou-sheet');
+    const propId = sheet.dataset.propId;
+    const p = getPropertyList().find(x=>x.id===propId);
+    if(!p) return;
+    const annual = (p.snapshot.rentRoll||[]).reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
+    const raw = priceEl.textContent.replace(/[^\d]/g,'');
+    const price = raw ? Number(raw) : 0;
+    const y = price>0 ? (annual/price*100).toFixed(2)+'%' : '—';
+    const yc = $('#gaiyouYieldCell');
+    if(yc) yc.textContent = y;
+  };
+  priceEl.addEventListener('input', update);
 }
 
 /* =========================================================
