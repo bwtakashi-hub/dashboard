@@ -785,12 +785,15 @@
   <!-- ===== LIST VIEW ===== -->
   <section class="view view-list hide">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div>
           <h2>📋 物件登録一覧</h2>
           <p class="desc" style="margin:4px 0 0">登録された物件の一覧。編集・複製・物件概要書作成・削除が行えます。</p>
         </div>
-        <button class="btn btn-primary" id="btnNewProperty">＋ 新規物件作成</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="btnSeedSample" title="サンプル物件「アジュール目黒」を登録">📥 サンプル登録</button>
+          <button class="btn btn-primary" id="btnNewProperty">＋ 新規物件作成</button>
+        </div>
       </div>
       <div style="overflow-x:auto">
         <table class="prop-table" id="propTable">
@@ -3326,7 +3329,97 @@ setTimeout(()=>{
     location.hash = '';
     location.reload();
   });
+  $('#btnSeedSample')?.addEventListener('click', seedAzureMeguro);
 }, 200);
+
+/* ===== サンプル物件: アジュール目黒 ===== */
+function seedAzureMeguro(){
+  const list = getPropertyList();
+  if(list.find(p=>p.name==='アジュール目黒')){
+    showToast('「アジュール目黒」は既に登録済みです','info');
+    return;
+  }
+  // レントロール（年間収支報告書 2024年実績ベース）
+  const rentRoll = [
+    {no:'101', plan:'1R', area:10.15, rent:64500, mgmt:3500, vacancy:false, note:''},
+    {no:'102', plan:'1R', area:10.15, rent:68000, mgmt:4000, vacancy:false, note:''},
+    {no:'103', plan:'1R', area:10.15, rent:68000, mgmt:4000, vacancy:false, note:'法人契約(株式会社灯白社)'},
+    {no:'105', plan:'1R', area:10.15, rent:65000, mgmt:3500, vacancy:false, note:''},
+    {no:'201', plan:'1R', area:10.19, rent:66500, mgmt:3500, vacancy:false, note:''},
+    {no:'202', plan:'1R', area:10.19, rent:68000, mgmt:4000, vacancy:false, note:''},
+    {no:'203', plan:'1R', area:10.19, rent:66500, mgmt:4000, vacancy:false, note:''},
+    {no:'205', plan:'1R', area:10.19, rent:74000, mgmt:4000, vacancy:false, note:'新規契約 2026/05/02'},
+  ];
+  // 経費（年間収支報告書から算出）
+  const expenses = {
+    mgmtRate: 5.5,           // 管理手数料364,584 / 収入合計6,628,870 ≒ 5.5%
+    repair: 24000,           // 定額リフォーム287,100 / 12ヶ月 ≒ 24,000円/月
+    tax: 350000,             // 推定（公課証明から要確認）
+    ins: 80000,              // 推定
+    etc: 230460,             // 点検19,800 + 入退去66,500 + 鍵交換11,000 + 更新手数料130,500 + 振込手数料3,960 - 修繕6,050 = 約230,000
+    vacancy: 5,
+    capMin: 4.5, capMid: 5.5, capMax: 6.5,
+    dcfRate: 6.0, rentDrop: 0.8,
+    evalName: '株式会社住まっぷ',
+  };
+  // 基本情報
+  const lands = [
+    {chiban:'品川区上大崎1丁目800-8', chimoku:'宅地', area:0, note:'登記上の地番（住居表示: 目黒区緑が丘1-21-1）'},
+    {chiban:'品川区上大崎1丁目800-31', chimoku:'宅地', area:0, note:''},
+  ];
+  const buildings = [
+    {name:'アジュール目黒', struct:'木造', year:2015, floor:160.00, note:'1R×8戸'},
+  ];
+  const basic = {
+    name: 'アジュール目黒',
+    zip: '152-0034',
+    pref: '東京都',
+    city: '目黒区',
+    addr: '緑が丘1-21-1',
+    lands, buildings,
+    land: 0,
+    floor: 160.00,
+    units: 8,
+    struct: '木造',
+    year: 2015,
+    age: new Date().getFullYear()-2015,
+    status: '満室',
+    park: 0, parkFee: 0,
+  };
+  // 暫定で計算実行
+  const SAVE_STATE = {basic, expenses, rentRoll};
+  // 計算用にSTATEを一時セット
+  const _bk = {b:STATE.basic, e:STATE.expenses, r:STATE.rentRoll, m:STATE.market};
+  STATE.basic = basic; STATE.expenses = expenses; STATE.rentRoll = rentRoll;
+  STATE.market = null;
+  const result = calcAll();
+  // 物件エントリ作成
+  const id = 'prop_seed_azure_' + Date.now();
+  const entry = {
+    id,
+    name: basic.name,
+    addr: `${basic.pref}${basic.city}${basic.addr}`,
+    struct: basic.struct,
+    year: basic.year,
+    units: basic.units,
+    priceMid: result.priceMid,
+    updatedAt: new Date().toISOString(),
+    snapshot: {
+      basic, expenses, rentRoll,
+      market: null, areaInfo: null, futureAI: null, taxInfo: null,
+      rrCitations: [],
+      evalComment: '年間収支報告書（2024年実績）と謄本情報をもとに登録。築年は推定。固定資産税・保険料は推定値、公課証明から要更新。',
+      result,
+    },
+  };
+  // STATEを元に戻す
+  STATE.basic = _bk.b; STATE.expenses = _bk.e; STATE.rentRoll = _bk.r; STATE.market = _bk.m;
+
+  list.unshift(entry);
+  savePropertyList(list);
+  renderPropertyList();
+  showToast('✅ サンプル物件「アジュール目黒」を登録しました','success');
+}
 
 /* =========================================================
  *  物件概要書（A4縦印刷対応）
