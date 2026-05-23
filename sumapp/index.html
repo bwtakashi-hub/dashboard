@@ -3887,7 +3887,10 @@ function buildGaiyouHTML(p){
   const iryou = nearest('XKT010','facility_name_ja');
   const hoiku = nearest('XKT007','facility_name_ja');
 
-  const transitText = eki ? `${eki.name}　徒歩 約${Math.ceil(eki.distance.replace(/[^\d.]/g,'')*1000/80)}分（直線 ${eki.distance}）` : (a.transit||'—');
+  // 公式API（XKT015）のみ信頼。古いAI推定データは使わない（住所変更後の旧情報残存を防ぐ）
+  const transitText = eki
+    ? `${eki.name}　徒歩 約${Math.ceil(parseFloat(eki.distance)*1000/80)}分（直線 ${eki.distance}）`
+    : '（公式API未取得：STEP1の「📡 公式データ一括取得」を実行してください）';
 
   return `
   <div class="gaiyou-sheet" data-prop-id="${p.id}">
@@ -3970,17 +3973,17 @@ function buildGaiyouHTML(p){
 
     <div class="g-section-title">▼ インフラ・接道</div>
     <table class="g-table">
-      <tr><th>電気</th><td>${ed('denki', ov.denki ?? (a.lifeline?.denki || '東京電力'))}</td><th>ガス</th><td>${ed('gas', ov.gas ?? (a.lifeline?.gas || '都市ガス'))}</td></tr>
-      <tr><th>上水道</th><td>${ed('suidou', ov.suidou ?? (a.lifeline?.suidou || '公営水道'))}</td><th>下水道</th><td>${ed('gesui', ov.gesui ?? (a.lifeline?.gesui || '公共下水'))}</td></tr>
-      <tr><th>接道状況</th><td colspan="3">${ed('douro', ov.douro ?? (a.douro || '—'))}</td></tr>
+      <tr><th>電気</th><td>${ed('denki', ov.denki ?? '—')}</td><th>ガス</th><td>${ed('gas', ov.gas ?? '—')}</td></tr>
+      <tr><th>上水道</th><td>${ed('suidou', ov.suidou ?? '—')}</td><th>下水道</th><td>${ed('gesui', ov.gesui ?? '—')}</td></tr>
+      <tr><th>接道状況</th><td colspan="3">${ed('douro', ov.douro ?? '—')}</td></tr>
     </table>
 
-    <div class="g-section-title">▼ 周辺施設</div>
+    <div class="g-section-title">▼ 周辺施設（公式API取得値）</div>
     <table class="g-table">
       <tr><th>最寄駅</th><td colspan="3">${ed('eki', ov.eki ?? (eki ? `${eki.name}　${eki.distance}${eki.extra?'　乗降客 '+eki.extra:''}` : '—'))}</td></tr>
       <tr><th>地価公示（最寄）</th><td colspan="3">${ed('chika', ov.chika ?? (chika ? `${chika.name}　${chika.distance}　${chika.extra||''}` : '—'))}</td></tr>
       <tr><th>小学校（最寄）</th><td>${ed('sho', ov.sho ?? (sho ? `${sho.name}　${sho.distance}` : '—'))}</td><th>医療機関（最寄）</th><td>${ed('iryou', ov.iryou ?? (iryou ? `${iryou.name}　${iryou.distance}` : '—'))}</td></tr>
-      <tr><th>保育園・幼稚園</th><td>${ed('hoiku', ov.hoiku ?? (hoiku ? `${hoiku.name}　${hoiku.distance}` : '—'))}</td><th>小学校区</th><td>${ed('shoKu', ov.shoKu ?? polyAny('XKT004'))}</td></tr>
+      <tr><th>保育園・幼稚園</th><td>${ed('hoiku', ov.hoiku ?? (hoiku ? `${hoiku.name}　${hoiku.distance}` : '—'))}</td><th>小学校区</th><td>${ed('shoKu', ov.shoKu ?? (polyAny('XKT004')||'—'))}</td></tr>
     </table>
 
     <div class="g-section-title">▼ 災害リスク</div>
