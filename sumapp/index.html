@@ -1699,7 +1699,7 @@ async function fetchReinfoZoning(lat, lon){
     // GASプロキシURL経由（URL内に ?key=... を含む形式）
     const sep = STATE.reinfoKey.includes('?') ? '&' : '?';
     const proxyUrl = STATE.reinfoKey + `${sep}api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
-    res = await fetch(proxyUrl);
+    res = await fetch(proxyUrl, { redirect: 'follow', mode: 'cors' });
   } else {
     // 直接呼び出し（CORS失敗の可能性大）
     const url = `https://www.reinfolib.mlit.go.jp/ex-api/external/XKT002?response_format=geojson&z=${t.z}&x=${t.x}&y=${t.y}`;
