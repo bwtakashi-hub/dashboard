@@ -4633,11 +4633,42 @@ setTimeout(()=>{
   });
   $('#closeDocList')?.addEventListener('click', ()=>$('#docListModal').classList.add('hide'));
   $('#docListModal')?.addEventListener('click', e=>{ if(e.target.id==='docListModal') $('#docListModal').classList.add('hide'); });
-  // propType を STATE / collectAll で永続化
   $('#propType')?.addEventListener('change', ()=>{
     if(STATE.basic) STATE.basic.propertyType = $('#propType').value;
+    applyPropertyTypeView();
   });
+  // 初期反映
+  applyPropertyTypeView();
 }, 400);
+
+/* 物件種別ごとのフォーム表示制御 */
+function applyPropertyTypeView(){
+  const t = $('#propType')?.value || '一棟マンション';
+  const isLand = t === '土地';
+  const isCondo = t === '区分マンション';
+  // 土地のみ：建物テーブル非表示
+  const bldgSection = document.querySelector('#bldgTable');
+  if(bldgSection){
+    const bldgWrap = bldgSection.closest('h3,div');
+    // h3+table+rowAdd+kpi をまとめて非表示
+    const headings = Array.from(document.querySelectorAll('section[data-panel="1"] h3'));
+    for(const h of headings){
+      if(/建物（複数棟対応/.test(h.textContent)){
+        let el = h;
+        const toHide = [el];
+        while(el.nextElementSibling && !/h3|h2/i.test(el.nextElementSibling.tagName) && el.nextElementSibling.id !== 'addBldg' && !el.nextElementSibling.matches('.actions')){
+          el = el.nextElementSibling;
+          toHide.push(el);
+          if(el.classList.contains('kpi')) break;
+        }
+        toHide.forEach(x=>x.style.display = isLand ? 'none' : '');
+        break;
+      }
+    }
+  }
+  // 区分マンション：土地明細はオプション扱い（非表示は強制しない、サブメッセージ追加）
+  // ※ 必要に応じてユーザーが「+ 筆を追加」を使う
+}
 
 /* =========================================================
  *  用語集データ
