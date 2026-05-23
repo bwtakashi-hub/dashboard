@@ -2077,7 +2077,7 @@ $('#btnAreaInfo').onclick = async ()=>{
   },
   "dosjou_osen": "土壌汚染リスク（土壌汚染対策法 要措置区域該否・推定）",
   "suishitsu": "水質汚染リスク（推定）",
-  "kisei": ["地域固有の規制・条例（例: 景観条例、屋外広告物条例等）"],
+  "kisei": ["地域固有の規制・条例を網羅的に列挙。具体例: 『目黒区景観条例』『品川区ワンルームマンション等の建築及び管理に関する条例』『東京都屋外広告物条例』『建築協定区域の有無』『緑化条例』『高齢者居住安定確保計画』『中高層建築物紛争予防条例』など。該当自治体で実際に施行されている条例名を正確に。不明なら『要確認』と明記"],
   "saigai_risk": ["災害リスク（洪水/土砂/津波/液状化等、ハザードマップ推定）"],
   "transit": "最寄駅・徒歩分（推定）",
   "shisetsu": "周辺施設（学校/病院/スーパー等の充実度コメント）",
@@ -4008,6 +4008,12 @@ function buildGaiyouHTML(p){
       <tr><th>地価公示（最寄）</th><td colspan="3">${ed('chika', ov.chika ?? (chika ? `${chika.name}　${chika.distance}　${chika.extra||''}` : '—'))}</td></tr>
       <tr><th>小学校（最寄）</th><td>${ed('sho', ov.sho ?? (sho ? `${sho.name}　${sho.distance}` : '—'))}</td><th>医療機関（最寄）</th><td>${ed('iryou', ov.iryou ?? (iryou ? `${iryou.name}　${iryou.distance}` : '—'))}</td></tr>
       <tr><th>保育園・幼稚園</th><td>${ed('hoiku', ov.hoiku ?? (hoiku ? `${hoiku.name}　${hoiku.distance}` : '—'))}</td><th>小学校区</th><td>${ed('shoKu', ov.shoKu ?? (polyAny('XKT004')||'—'))}</td></tr>
+    </table>
+
+    <div class="g-section-title">▼ 地域条例・規制（AI推定）</div>
+    <table class="g-table">
+      <tr><th style="width:22%">該当条例</th><td colspan="3">${ed('kisei', ov.kisei ?? ((a.kisei && a.kisei.length)? a.kisei.map(k=>'・'+k).join('<br>') : '（STEP1の「🤖 AI推定（補完情報）」を実行してください）'))}</td></tr>
+      <tr><th>確認方法</th><td colspan="3" style="font-size:9pt;color:#64748b">${ed('kiseiCheck', ov.kiseiCheck ?? '※ AI推定値です。正確な情報は自治体HP（都市計画課・建築指導課）でご確認ください')}</td></tr>
     </table>
 
     <div class="g-section-title">▼ 災害リスク</div>
