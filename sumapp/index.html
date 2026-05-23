@@ -838,6 +838,7 @@
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
+        <button class="btn btn-ghost" id="btnGaiyouAIStation" title="AI推定で最寄駅を再取得">🚉 駅情報を更新</button>
         <button class="btn btn-primary" id="btnGaiyouSave">💾 更新を保存</button>
         <button class="btn btn-green" id="btnGaiyouPrint" onclick="window.print()">🖨 A4印刷 / PDF保存</button>
       </div>
@@ -4020,8 +4021,48 @@ function openGaiyou(id){
   showView('gaiyou');
   setTimeout(bindGaiyouEvents, 50);
 }
-// 保存ボタン
-setTimeout(()=>{ $('#btnGaiyouSave')?.addEventListener('click', saveGaiyouOverrides); }, 300);
+
+/* AI推定で最寄駅情報を取得→物件に保存 */
+async function updateStationByAI(){
+  const sheet = $('.gaiyou-sheet');
+  if(!sheet) return;
+  const propId = sheet.dataset.propId;
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===propId);
+  if(!p){ showToast('物件が見つかりません','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+  const b = p.snapshot.basic||{};
+  const addr = `${b.pref||''}${b.city||''}${b.addr||''}`.trim();
+  if(!addr){ showToast('所在地が空です','error'); return; }
+
+  showToast('🤖 AIで最寄駅を調査中…');
+  try{
+    const prompt = `日本の住所「${addr}」について、最寄駅情報をJSONのみで返してください。前置き・解説不要。
+
+{
+  "transit": "最寄駅情報（路線名・駅名・徒歩分。最大3駅まで複数掲載可）"
+}
+
+例: "JR山手線『目黒』駅 徒歩7分／東急目黒線『目黒』駅 徒歩8分／南北線『目黒』駅 徒歩8分"`;
+    const text = await callClaude([{role:'user',content:prompt}], '', 800);
+    const data = extractJson(text);
+    if(!p.snapshot.gaiyouOverride) p.snapshot.gaiyouOverride = {};
+    p.snapshot.gaiyouOverride.transit = data.transit || '—';
+    savePropertyList(list);
+    showToast('✅ 最寄駅を更新しました','success');
+    // 再描画
+    $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
+    setTimeout(bindGaiyouEvents, 50);
+  }catch(err){
+    showToast('駅情報取得失敗: '+err.message,'error');
+  }
+}
+
+// ボタンバインド
+setTimeout(()=>{
+  $('#btnGaiyouSave')?.addEventListener('click', saveGaiyouOverrides);
+  $('#btnGaiyouAIStation')?.addEventListener('click', updateStationByAI);
+}, 300);
 
 function buildGaiyouHTML(p){
   const s = p.snapshot, b = s.basic||{}, e = s.expenses||{}, r = s.result||{}, a = s.areaInfo || {};
@@ -4086,10 +4127,10 @@ function buildGaiyouHTML(p){
   const iryou = nearest('XKT010','facility_name_ja');
   const hoiku = nearest('XKT007','facility_name_ja');
 
-  // 公式API（XKT015）のみ信頼。古いAI推定データは使わない（住所変更後の旧情報残存を防ぐ）
+  // 最寄駅：公式API → AI推定(ov.transit) → デフォルトメッセージ の順
   const transitText = eki
     ? `${eki.line?eki.line+' ':''}${eki.name}駅　徒歩 約${Math.ceil(parseFloat(eki.distance)*1000/80)}分（直線 ${eki.distance}）${eki.extra?'　乗降客 '+eki.extra:''}`
-    : '（公式API未取得：STEP1の「📡 公式データ一括取得」を実行してください）';
+    : (ov.transit && !/緑が丘|自由が丘/.test(ov.transit) ? ov.transit : '（右上「🚉 駅情報を更新」ボタンでAI推定取得 or 手入力可）');
 
   return `
   <div class="gaiyou-sheet" data-prop-id="${p.id}">
