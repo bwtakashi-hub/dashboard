@@ -838,7 +838,7 @@
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
-        <button class="btn btn-ghost" id="btnGaiyouAIStation" title="AI推定で最寄駅を再取得">🚉 駅情報を更新</button>
+        <button class="btn btn-ghost" id="btnGaiyouAIStation" title="AI推定で最寄駅・ライフライン・周辺環境を一括取得">🤖 概要書情報を一括更新</button>
         <button class="btn btn-primary" id="btnGaiyouSave">💾 更新を保存</button>
         <button class="btn btn-green" id="btnGaiyouPrint" onclick="window.print()">🖨 A4印刷 / PDF保存</button>
       </div>
@@ -4022,7 +4022,7 @@ function openGaiyou(id){
   setTimeout(bindGaiyouEvents, 50);
 }
 
-/* AI推定で最寄駅情報を取得→物件に保存 */
+/* AI推定で 最寄駅・ライフライン・周辺環境 を一括取得→物件に保存 */
 async function updateStationByAI(){
   const sheet = $('.gaiyou-sheet');
   if(!sheet) return;
@@ -4035,26 +4035,57 @@ async function updateStationByAI(){
   const addr = `${b.pref||''}${b.city||''}${b.addr||''}`.trim();
   if(!addr){ showToast('所在地が空です','error'); return; }
 
-  showToast('🤖 AIで最寄駅を調査中…');
+  showToast('🤖 AIで最寄駅・ライフライン・周辺環境を調査中…');
   try{
-    const prompt = `日本の住所「${addr}」について、最寄駅情報をJSONのみで返してください。前置き・解説不要。
+    const prompt = `日本の住所「${addr}」について、以下をJSONのみで返してください。前置き・解説・コードブロック装飾は不要。
+
+【最重要ルール】
+- 徒歩分は「徒歩7分」など **1つの確定値**。「5～8分」「約5～8分」「推定」等の曖昧表現は禁止。
+- 不明な場合も推定で確定値を返す（「徒歩10分」等）
+- ライフラインは事業者名・種別を具体的に記載
 
 {
-  "transit": "最寄駅情報（路線名・駅名・徒歩分。最大3駅まで複数掲載可）"
+  "transit": "最寄駅情報（路線名+駅名+徒歩分、複数駅可、必ず確定値）",
+  "denki": "電気事業者名（例: 東京電力）",
+  "gas": "ガス種別と事業者（例: 都市ガス 東京ガス、プロパンガス）",
+  "suidou": "上水道（例: 公営水道、簡易水道）",
+  "gesui": "下水道（例: 公共下水道、合併浄化槽、単独浄化槽、汲み取り）",
+  "shisetsu": "周辺施設・住環境を150字以内で具体的に。スーパー名（成城石井/東急ストア等）・コンビニ・商業施設・駅前環境・住宅街の特徴等を含める"
 }
 
-例: "JR山手線『目黒』駅 徒歩7分／東急目黒線『目黒』駅 徒歩8分／南北線『目黒』駅 徒歩8分"`;
-    const text = await callClaude([{role:'user',content:prompt}], '', 800);
+【例】
+{
+  "transit": "JR山手線『目黒』駅 徒歩7分／東急目黒線『目黒』駅 徒歩8分／南北線『目黒』駅 徒歩8分",
+  "denki": "東京電力",
+  "gas": "都市ガス 東京ガス",
+  "suidou": "公営水道",
+  "gesui": "公共下水道",
+  "shisetsu": "スーパー（成城石井、東急ストア等）が充実。目黒駅周辺は商業施設・飲食店が密集。高級住宅街として知られるエリア。"
+}`;
+    const text = await callClaude([{role:'user',content:prompt}], '', 1500);
     const data = extractJson(text);
     if(!p.snapshot.gaiyouOverride) p.snapshot.gaiyouOverride = {};
-    p.snapshot.gaiyouOverride.transit = data.transit || '—';
+    const ov = p.snapshot.gaiyouOverride;
+    // 徒歩分の確定化（「○～○分」「約」「推定」を除去）
+    let transit = data.transit || '';
+    transit = transit.replace(/約/g,'').replace(/推定/g,'').replace(/（[^）]*推定[^）]*）/g,'');
+    // 「5～8分」→「7分」(中央値) に変換
+    transit = transit.replace(/(\d+)\s*[～〜~-]\s*(\d+)\s*分/g, (_,a,b)=>{
+      return Math.round((Number(a)+Number(b))/2)+'分';
+    });
+    ov.transit = transit.trim();
+    if(data.denki) ov.denki = data.denki;
+    if(data.gas) ov.gas = data.gas;
+    if(data.suidou) ov.suidou = data.suidou;
+    if(data.gesui) ov.gesui = data.gesui;
+    if(data.shisetsu) ov.shisetsu = data.shisetsu;
     savePropertyList(list);
-    showToast('✅ 最寄駅を更新しました','success');
+    showToast('✅ 概要書情報を一括更新しました','success');
     // 再描画
     $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
     setTimeout(bindGaiyouEvents, 50);
   }catch(err){
-    showToast('駅情報取得失敗: '+err.message,'error');
+    showToast('情報取得失敗: '+err.message,'error');
   }
 }
 
@@ -4215,9 +4246,14 @@ function buildGaiyouHTML(p){
       </tr>
     </table>
 
+    <div class="g-section-title">▼ 周辺環境（AI推定）</div>
+    <table class="g-table">
+      <tr><td colspan="4" style="line-height:1.6">${ed('shisetsu', ov.shisetsu ?? '（右上「🤖 概要書情報を一括更新」ボタンで取得 / 手入力可）')}</td></tr>
+    </table>
+
     <div class="g-section-title">▼ 備考</div>
     <table class="g-table">
-      <tr><td colspan="4" style="height:110px;vertical-align:top;line-height:1.8">${ed('memo', ov.memo ?? '・\n・\n・\n・\n・\n・\n・')}</td></tr>
+      <tr><td colspan="4" style="height:90px;vertical-align:top;line-height:1.8">${ed('memo', ov.memo ?? '・\n・\n・\n・\n・\n・\n・')}</td></tr>
     </table>
 
     <div class="g-foot">
