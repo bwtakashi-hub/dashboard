@@ -448,7 +448,7 @@
           <div style="font-size:11px;color:var(--sub)">用途地域・建ぺい率/容積率は<b style="color:var(--green)">公式API</b>から、ライフライン・規制等は<b style="color:var(--blue)">AI推定</b>で取得</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-green" id="btnReinfoOfficial">📡 公式API（用途地域）</button>
+          <button class="btn btn-green" id="btnReinfoOfficial" title="国交省 不動産情報ライブラリ 22API一括取得">📡 公式データ一括取得（22API）</button>
           <button class="btn btn-primary" id="btnAreaInfo">🤖 AI推定（補完情報）</button>
         </div>
       </div>
@@ -1763,74 +1763,234 @@ async function fetchReinfoZoning(lat, lon){
   return geo.features[0].properties; // ヒットなしなら先頭を採用
 }
 
-/* ---------- 公式API（不動産情報ライブラリ）から用途地域取得 ---------- */
+/* ---------- 公式API 22個 一括取得 ---------- */
 $('#btnReinfoOfficial').onclick = async ()=>{
   collectAll();
   const b = STATE.basic;
   const addr = `${b.pref||''}${b.city||''}${b.addr||''}`.trim();
   if(!addr){ showToast('STEP1で所在地を入力してください','error'); return; }
-  if(!STATE.reinfoKey){ showToast('不動産情報ライブラリAPIキーを画面右上から登録してください','error'); return; }
+  if(!STATE.reinfoKey){ showToast('GASプロキシURL（不動産Lib欄）を設定してください','error'); return; }
 
   const out = $('#reinfoResult');
-  out.innerHTML = '<div style="color:var(--green);font-size:12px">📡 国土地理院ジオコーダー → 国交省XKT002 で公式データ取得中…</div>';
+  out.innerHTML = '<div style="color:var(--green);font-size:12px">📡 国土地理院ジオコーディング → 22API並列取得中…<div id="reinfoProgress" style="margin-top:4px;font-size:10px;color:var(--sub)">準備中</div></div>';
 
   try{
     const geo = await geocodeAddress(addr);
-    const props = await fetchReinfoZoning(geo.lat, geo.lon);
-    if(!props){
-      out.innerHTML = '<div style="color:var(--orange);font-size:12px">⚠ 該当エリアに用途地域データなし（市街化調整区域・非都市計画区域の可能性）</div>';
-      return;
-    }
-    const youto   = props.use_area_ja || props.use_area || '—';
-    const kenpei  = props.u_building_coverage_ratio_ja || props.building_coverage_ratio_ja || '—';
-    const yoseki  = props.u_floor_area_ratio_ja || props.floor_area_ratio_ja || '—';
-    const fire    = props.fire_prevention_district_ja || props.fire_prevention_ja || '—';
-    const height  = props.height_district_ja || '—';
-
+    out.innerHTML = `<div style="color:var(--green);font-size:12px">✅ 座標取得: ${geo.title||addr} (${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)})<div id="reinfoProgress" style="margin-top:4px;font-size:10px;color:var(--sub)">22APIを並列実行中…</div></div>`;
+    const results = await fetchAllOfficial(geo.lat, geo.lon, (done, total, name)=>{
+      const p = $('#reinfoProgress');
+      if(p) p.innerHTML = `🔄 ${done}/${total} 完了 (${name})`;
+    });
+    // 結果集計
+    const summary = Object.values(results);
+    const ok = summary.filter(r=>!r.error && !r.empty).length;
+    const empty = summary.filter(r=>r.empty).length;
+    const err = summary.filter(r=>r.error).length;
+    const html = renderOfficialResults(results);
     out.innerHTML = `
-      <div style="padding:12px;border-radius:10px;background:rgba(16,185,129,0.10);border:1px solid rgba(16,185,129,0.35);margin-top:6px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-size:12px;color:var(--green);font-weight:700">✅ 国交省 公式データ取得完了</div>
+      <div style="padding:12px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.35)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px">
+          <div style="font-size:12px;color:var(--green);font-weight:700">✅ 22API 取得完了 — ${ok}項目該当 / ${empty}区域外 / ${err}エラー</div>
           <div style="font-size:10px;color:var(--sub)">${geo.title||addr} (${geo.lat.toFixed(5)}, ${geo.lon.toFixed(5)})</div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-          <div style="padding:8px;background:rgba(255,255,255,0.04);border-radius:6px">
-            <div style="font-size:10px;color:var(--sub);letter-spacing:.1em">用途地域</div>
-            <div style="font-weight:800;font-size:14px;margin-top:2px">${youto}</div>
-          </div>
-          <div style="padding:8px;background:rgba(255,255,255,0.04);border-radius:6px">
-            <div style="font-size:10px;color:var(--sub);letter-spacing:.1em">建ぺい率</div>
-            <div style="font-weight:800;font-size:14px;margin-top:2px;color:var(--blue)">${kenpei}</div>
-          </div>
-          <div style="padding:8px;background:rgba(255,255,255,0.04);border-radius:6px">
-            <div style="font-size:10px;color:var(--sub);letter-spacing:.1em">容積率</div>
-            <div style="font-weight:800;font-size:14px;margin-top:2px;color:var(--blue)">${yoseki}</div>
-          </div>
-          <div style="padding:8px;background:rgba(255,255,255,0.04);border-radius:6px">
-            <div style="font-size:10px;color:var(--sub);letter-spacing:.1em">防火地域</div>
-            <div style="font-size:12px;margin-top:2px">${fire}</div>
-          </div>
-          <div style="padding:8px;background:rgba(255,255,255,0.04);border-radius:6px">
-            <div style="font-size:10px;color:var(--sub);letter-spacing:.1em">高度地区</div>
-            <div style="font-size:12px;margin-top:2px">${height}</div>
-          </div>
-          <div style="padding:8px;background:rgba(16,185,129,0.06);border-radius:6px;font-size:10px;color:var(--green);display:flex;align-items:center;justify-content:center">公式値<br>（自治体GIS）</div>
-        </div>
+        ${html}
       </div>`;
-    // STATE.areaInfo に統合
-    if(!STATE.areaInfo) STATE.areaInfo = {};
-    STATE.areaInfo.youto_chiiki = youto;
-    STATE.areaInfo.kenpei = kenpei;
-    STATE.areaInfo.yoseki = yoseki;
-    STATE.areaInfo.boukaku = fire;
-    STATE.areaInfo.koudo = height;
-    STATE.areaInfo._official = { geo, props };
-    showToast('✅ 公式データを取得しました','success');
+    showToast(`✅ 22API取得完了（該当${ok}件）`,'success');
   }catch(err){
-    out.innerHTML = `<div style="color:var(--red);font-size:12px">❌ ${err.message}${err.message.includes('CORS')||err.message.includes('NetworkError')?'<br>→ ブラウザCORSの可能性。プロキシ経由が必要かもしれません':''}</div>`;
+    out.innerHTML = `<div style="color:var(--red);font-size:12px;padding:10px;background:rgba(239,68,68,0.08);border-radius:8px">❌ ${err.message}</div>`;
     showToast('公式API失敗: '+err.message,'error');
   }
 };
+
+/* =========================================================
+ *  不動産情報ライブラリ 22API 並列取得（フルセット）
+ * ========================================================= */
+const REINFO_API_LIST = [
+  // 法規制
+  { id:'XKT001', name:'都市計画区域/区域区分', cat:'法規制', type:'polygon' },
+  { id:'XKT002', name:'用途地域', cat:'法規制', type:'polygon' },
+  { id:'XKT014', name:'防火・準防火地域', cat:'法規制', type:'polygon' },
+  { id:'XKT030', name:'都市計画道路', cat:'法規制', type:'polygon' },
+  { id:'XKT023', name:'地区計画', cat:'法規制', type:'polygon' },
+  { id:'XKT024', name:'高度利用地区', cat:'法規制', type:'polygon' },
+  // 防災
+  { id:'XKT016', name:'災害危険区域', cat:'防災', type:'polygon' },
+  { id:'XKT020', name:'大規模盛土造成地', cat:'防災', type:'polygon' },
+  { id:'XKT021', name:'地すべり防止区域', cat:'防災', type:'polygon' },
+  { id:'XKT022', name:'急傾斜地崩壊危険区域', cat:'防災', type:'polygon' },
+  { id:'XKT025', name:'液状化発生傾向', cat:'防災', type:'polygon' },
+  { id:'XKT026', name:'洪水浸水想定区域', cat:'防災', type:'polygon' },
+  { id:'XKT027', name:'高潮浸水想定区域', cat:'防災', type:'polygon' },
+  { id:'XKT028', name:'津波浸水想定', cat:'防災', type:'polygon' },
+  { id:'XKT029', name:'土砂災害警戒区域', cat:'防災', type:'polygon' },
+  // 価格
+  { id:'XPT002', name:'地価公示・地価調査', cat:'価格', type:'point' },
+  // 周辺施設・統計
+  { id:'XKT004', name:'小学校区', cat:'立地', type:'polygon' },
+  { id:'XKT005', name:'中学校区', cat:'立地', type:'polygon' },
+  { id:'XKT015', name:'駅別乗降客数', cat:'立地', type:'point' },
+  { id:'XKT010', name:'医療機関', cat:'立地', type:'point' },
+  { id:'XKT007', name:'保育園・幼稚園', cat:'立地', type:'point' },
+  { id:'XKT031', name:'人口集中地区', cat:'立地', type:'polygon' },
+];
+
+async function fetchReinfoAPI(apiId, lat, lon, zoom=13){
+  if(!STATE.reinfoKey || !/^https?:\/\//.test(STATE.reinfoKey)){
+    throw new Error('GASプロキシURL未設定');
+  }
+  const u = new URL(STATE.reinfoKey);
+  const rawKey = u.searchParams.get('key') || '';
+  u.searchParams.set('api', apiId);
+  u.searchParams.set('lat', String(lat));
+  u.searchParams.set('lon', String(lon));
+  u.searchParams.set('zoom', String(zoom));
+  if(rawKey) u.searchParams.set('key', rawKey.trim());
+  const res = await fetch(u.toString(), { redirect:'follow', mode:'cors' });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const ctype = res.headers.get('content-type') || '';
+  if(ctype.includes('html')) throw new Error('GASアクセス権限エラー');
+  const data = await res.json();
+  if(data.error){
+    if(/404/.test(data.error)) return null; // 該当データなし
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+/* 点in多角形 + 最寄ポイント取得ユーティリティ */
+function pipPolygon(pt, ring){
+  const [px, py] = pt;
+  let inside = false;
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if(((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function findContainingFeatures(geo, lat, lon){
+  if(!geo || !geo.features) return [];
+  const hits = [];
+  for(const f of geo.features){
+    const g = f.geometry;
+    if(!g) continue;
+    if(g.type === 'Polygon' && pipPolygon([lon, lat], g.coordinates[0])) hits.push(f.properties);
+    else if(g.type === 'MultiPolygon'){
+      for(const poly of g.coordinates){ if(pipPolygon([lon, lat], poly[0])){ hits.push(f.properties); break; } }
+    }
+  }
+  return hits;
+}
+function haversineKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function findNearestPoints(geo, lat, lon, n=3){
+  if(!geo || !geo.features) return [];
+  const arr = [];
+  for(const f of geo.features){
+    if(!f.geometry || f.geometry.type !== 'Point') continue;
+    const [plon, plat] = f.geometry.coordinates;
+    arr.push({ props: f.properties, distance: haversineKm(lat, lon, plat, plon), lat:plat, lon:plon });
+  }
+  arr.sort((a,b)=>a.distance-b.distance);
+  return arr.slice(0, n);
+}
+
+/* 22API並列実行 */
+async function fetchAllOfficial(lat, lon, progressCb){
+  const results = {};
+  let done = 0;
+  await Promise.all(REINFO_API_LIST.map(async (api)=>{
+    try{
+      const data = await fetchReinfoAPI(api.id, lat, lon);
+      if(!data || !data.features) {
+        results[api.id] = { name:api.name, cat:api.cat, type:api.type, empty:true };
+      } else if(api.type === 'polygon'){
+        const hits = findContainingFeatures(data, lat, lon);
+        results[api.id] = { name:api.name, cat:api.cat, type:'polygon', hits, count:data.features.length };
+      } else {
+        const nearest = findNearestPoints(data, lat, lon, 3);
+        results[api.id] = { name:api.name, cat:api.cat, type:'point', nearest, count:data.features.length };
+      }
+    }catch(e){
+      results[api.id] = { name:api.name, cat:api.cat, type:api.type, error:e.message };
+    }
+    done++;
+    if(progressCb) progressCb(done, REINFO_API_LIST.length, api.name);
+  }));
+  return results;
+}
+
+/* レンダリング：カテゴリ別折りたたみ表示 */
+function renderOfficialResults(results){
+  const cats = ['法規制','防災','価格','立地'];
+  const catColor = {法規制:'#0ea5e9', 防災:'#ef4444', 価格:'#10b981', 立地:'#8b5cf6'};
+  const catIcon = {法規制:'🏛', 防災:'🌊', 価格:'💴', 立地:'🚉'};
+
+  // 主要項目をフラットに抽出（STATE.areaInfoにマージ）
+  function pickFirst(arr, keys){
+    if(!arr || !arr.length) return null;
+    const o = arr[0];
+    for(const k of keys){ if(o[k] != null && o[k] !== '') return o[k]; }
+    return null;
+  }
+  const r = results;
+  if(!STATE.areaInfo) STATE.areaInfo = {};
+  // 用途地域・建蔽・容積
+  if(r.XKT002 && r.XKT002.hits && r.XKT002.hits.length){
+    STATE.areaInfo.youto_chiiki = pickFirst(r.XKT002.hits, ['use_area_ja','use_area']);
+    STATE.areaInfo.kenpei = pickFirst(r.XKT002.hits, ['u_building_coverage_ratio_ja','building_coverage_ratio_ja']);
+    STATE.areaInfo.yoseki = pickFirst(r.XKT002.hits, ['u_floor_area_ratio_ja','floor_area_ratio_ja']);
+  }
+  if(r.XKT001 && r.XKT001.hits && r.XKT001.hits.length){
+    STATE.areaInfo.toshi_keikaku = pickFirst(r.XKT001.hits, ['urban_area_ja','kuiki_kubun_ja','area_type_ja']);
+  }
+  if(r.XKT014 && r.XKT014.hits && r.XKT014.hits.length){
+    STATE.areaInfo.boukaku = pickFirst(r.XKT014.hits, ['fire_prevention_district_ja','fire_district_ja']);
+  }
+  STATE.areaInfo._reinfo_full = results;
+
+  // カテゴリ別HTML生成
+  function rowHtml(api){
+    if(api.error) return `<div style="font-size:10px;color:#ef4444">${api.name}: ❌ ${api.error}</div>`;
+    if(api.empty) return `<div style="font-size:10px;color:var(--sub)">${api.name}: <span style="color:#10b981">該当区域外（影響なし）</span></div>`;
+    if(api.type === 'polygon'){
+      if(api.hits && api.hits.length){
+        const summary = api.hits.slice(0,2).map(h=>{
+          const keys = Object.keys(h).filter(k=>!k.startsWith('_') && typeof h[k]!=='object').slice(0,3);
+          return keys.map(k=>`${k}: <b>${h[k]}</b>`).join(' / ');
+        }).join('<br>');
+        return `<div style="font-size:11px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,0.04);margin:2px 0"><b style="color:#fff">${api.name}</b><br><span style="color:var(--sub)">${summary}</span></div>`;
+      } else {
+        return `<div style="font-size:10px;color:var(--sub)">${api.name}: <span style="color:#10b981">該当区域外</span></div>`;
+      }
+    } else {
+      // point
+      if(api.nearest && api.nearest.length){
+        const n0 = api.nearest[0];
+        const name = n0.props.station_name_ja || n0.props.facility_name_ja || n0.props.name_ja || n0.props.name || n0.props.title || JSON.stringify(n0.props).slice(0,50);
+        const extra = n0.props.passenger_volume_2022_ja || n0.props.land_price_ja || n0.props.passenger_volume_ja || '';
+        return `<div style="font-size:11px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,0.04);margin:2px 0"><b style="color:#fff">${api.name}</b><br><span style="color:var(--sub)">最寄: ${name} <b>${n0.distance.toFixed(2)}km</b> ${extra?'/ '+extra:''}</span></div>`;
+      } else {
+        return `<div style="font-size:10px;color:var(--sub)">${api.name}: 周辺なし</div>`;
+      }
+    }
+  }
+
+  const html = cats.map(cat=>{
+    const apis = REINFO_API_LIST.filter(a=>a.cat===cat);
+    const cardsHtml = apis.map(a=>rowHtml(results[a.id])).join('');
+    return `
+      <details open style="margin-top:8px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border)">
+        <summary style="cursor:pointer;font-size:12px;font-weight:700;color:${catColor[cat]};letter-spacing:.08em">${catIcon[cat]} ${cat}（${apis.length}項目）</summary>
+        <div style="margin-top:6px">${cardsHtml}</div>
+      </details>`;
+  }).join('');
+  return html;
+}
 
 /* ---------- Area Info (住所→公的規制等) ---------- */
 $('#btnAreaInfo').onclick = async ()=>{
@@ -3205,8 +3365,35 @@ function buildReportHTML(){
   <!-- ===== PAGE 4 : エリア情報＋相場根拠 ===== -->
   <div class="pdf-page">
     <h1>エリア情報 ／ 近隣相場</h1>
+    ${a && a._reinfo_full ? `
+    <h2>国交省公式データ（22項目）</h2>
+    ${['法規制','防災','価格','立地'].map(cat=>{
+      const rows = REINFO_API_LIST.filter(api=>api.cat===cat).map(api=>{
+        const r = a._reinfo_full[api.id];
+        if(!r) return '';
+        if(r.error) return `<tr><td>${api.name}</td><td colspan="2" style="color:#b91c1c">エラー: ${r.error}</td></tr>`;
+        if(r.empty) return `<tr><td>${api.name}</td><td colspan="2" style="color:#10b981">該当区域外</td></tr>`;
+        if(r.type==='polygon'){
+          if(r.hits && r.hits.length){
+            const v = r.hits[0];
+            const txt = Object.keys(v).filter(k=>!k.startsWith('_')&&typeof v[k]!=='object').slice(0,3).map(k=>`${k}: ${v[k]}`).join(' / ');
+            return `<tr><td>${api.name}</td><td colspan="2">${txt}</td></tr>`;
+          }
+          return `<tr><td>${api.name}</td><td colspan="2" style="color:#10b981">区域外</td></tr>`;
+        }
+        if(r.nearest && r.nearest.length){
+          const n0 = r.nearest[0];
+          const name = n0.props.station_name_ja || n0.props.facility_name_ja || n0.props.name_ja || n0.props.name || n0.props.title || '—';
+          return `<tr><td>${api.name}</td><td>${name}</td><td class="num">${n0.distance.toFixed(2)} km</td></tr>`;
+        }
+        return '';
+      }).join('');
+      return rows ? `<h3 style="margin:6px 0 2px">▼ ${cat}</h3><table class="pdf-table" style="font-size:9px"><tr><th style="width:35%">項目</th><th>内容</th><th style="width:12%">距離</th></tr>${rows}</table>` : '';
+    }).join('')}
+    ` : ''}
+
     ${a ? `
-    <h2>法規制・インフラ</h2>
+    <h2>法規制・インフラ（AI推定）</h2>
     <table class="pdf-table">
       <tr><th style="width:22%">用途地域</th><td>${a.youto_chiiki||'—'}</td><th style="width:22%">建ぺい/容積</th><td>${a.kenpei||'—'} / ${a.yoseki||'—'}</td></tr>
       <tr><th>都市計画区分</th><td>${a.toshi_keikaku||'—'}</td><th>防火地域</th><td>${a.boukaku||'—'}</td></tr>
