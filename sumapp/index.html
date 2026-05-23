@@ -1,0 +1,3649 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>収益物件AI査定シミュレーター | Gate.系UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(window['pdfjsLib']){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+<style>
+  :root{
+    --bg:#060b18;
+    --bg2:#0a1226;
+    --card:rgba(255,255,255,0.04);
+    --card-border:rgba(255,255,255,0.08);
+    --blue:#0ea5e9;
+    --green:#10b981;
+    --orange:#f59e0b;
+    --red:#ef4444;
+    --purple:#8b5cf6;
+    --text:#f1f5f9;
+    --sub:#94a3b8;
+    --mute:#475569;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Noto Sans JP","Inter",sans-serif;-webkit-font-smoothing:antialiased}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 20% -10%, rgba(14,165,233,0.18), transparent 60%),
+      radial-gradient(900px 500px at 90% 10%, rgba(139,92,246,0.15), transparent 60%),
+      radial-gradient(800px 600px at 50% 100%, rgba(16,185,129,0.12), transparent 60%),
+      var(--bg);
+  }
+  a{color:var(--blue)}
+  h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:.02em}
+
+  /* ===== Layout ===== */
+  .wrap{max-width:1280px;margin:0 auto;padding:24px}
+  header.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;border-radius:18px;
+    background:linear-gradient(135deg,rgba(14,165,233,0.10),rgba(139,92,246,0.10));
+    border:1px solid var(--card-border);
+    backdrop-filter:blur(20px);
+    margin-bottom:24px;
+  }
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo .badge{
+    width:42px;height:42px;border-radius:12px;
+    background:linear-gradient(135deg,var(--blue),var(--purple));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;
+    box-shadow:0 6px 24px rgba(14,165,233,0.35);
+    font-family:Inter;
+  }
+  .logo .title{font-size:18px;font-weight:800;letter-spacing:.04em}
+  .logo .subtitle{font-size:11px;color:var(--sub);letter-spacing:.2em}
+
+  .topnav{display:flex;gap:4px;align-items:center}
+  .nav-link{display:inline-block;padding:8px 14px;border-radius:10px;color:var(--sub);text-decoration:none;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;letter-spacing:.04em}
+  .nav-link:hover{background:rgba(255,255,255,0.06);color:var(--text)}
+  .nav-link.active{background:linear-gradient(135deg,rgba(14,165,233,0.25),rgba(139,92,246,0.25));color:#fff;border:1px solid rgba(14,165,233,0.4)}
+  .view{animation:fadeIn .3s ease}
+  .nav-card{display:block;padding:32px 24px;border-radius:16px;background:linear-gradient(135deg,rgba(14,165,233,0.10),rgba(139,92,246,0.10));border:1px solid var(--card-border);cursor:pointer;transition:.25s;color:var(--text)}
+  .nav-card:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(14,165,233,0.25);border-color:rgba(14,165,233,0.5)}
+  .nav-card-title{font-size:18px;font-weight:800;margin:12px 0 6px}
+  .nav-card-desc{font-size:12px;color:var(--sub);line-height:1.7}
+  .prop-table{width:100%;border-collapse:collapse;font-size:13px}
+  .prop-table th{padding:10px 12px;background:rgba(14,165,233,0.10);color:var(--text);text-align:left;font-weight:600;font-size:11px;letter-spacing:.1em;border-bottom:1px solid var(--card-border)}
+  .prop-table td{padding:10px 12px;border-bottom:1px solid var(--card-border);vertical-align:middle}
+  .prop-table tr:hover td{background:rgba(255,255,255,0.04)}
+  .prop-actions button{padding:4px 10px;font-size:11px;border-radius:6px;border:none;cursor:pointer;margin:0 2px}
+  .api-panel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:520px}
+  .api-panel input{
+    width:280px;padding:10px 12px;border-radius:10px;border:1px solid var(--card-border);
+    background:rgba(0,0,0,0.4);color:var(--text);font-family:inherit;font-size:12px;
+  }
+  .api-panel input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(14,165,233,0.25)}
+  .pill{padding:6px 12px;border-radius:99px;font-size:11px;border:1px solid var(--card-border);background:rgba(255,255,255,0.04);color:var(--sub)}
+  .pill.green{color:var(--green);border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.08)}
+  .pill.red{color:var(--red);border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.08)}
+
+  /* ===== Stepper ===== */
+  .stepper{display:flex;align-items:center;gap:6px;margin-bottom:24px;flex-wrap:wrap}
+  .step{
+    flex:1;min-width:180px;
+    padding:14px 16px;border-radius:14px;
+    background:var(--card);border:1px solid var(--card-border);
+    backdrop-filter:blur(12px);
+    display:flex;align-items:center;gap:12px;cursor:pointer;transition:.2s;
+  }
+  .step:hover{transform:translateY(-1px);border-color:rgba(14,165,233,0.3)}
+  .step .num{
+    width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,0.06);font-weight:800;color:var(--sub);font-family:Inter;
+  }
+  .step.active{background:linear-gradient(135deg,rgba(14,165,233,0.18),rgba(139,92,246,0.18));border-color:var(--blue)}
+  .step.active .num{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+  .step.done .num{background:var(--green);color:#fff}
+  .step .lbl{font-size:13px;font-weight:600;line-height:1.3}
+  .step .sublbl{font-size:10px;color:var(--sub);letter-spacing:.1em}
+  .step-arrow{color:var(--mute);font-size:18px}
+
+  /* ===== Cards / Forms ===== */
+  .card{
+    background:var(--card);border:1px solid var(--card-border);border-radius:18px;
+    backdrop-filter:blur(20px);padding:24px;margin-bottom:18px;
+    animation:fadeIn .4s ease;
+  }
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .card h2{font-size:18px;margin-bottom:6px}
+  .card .desc{color:var(--sub);font-size:12px;margin-bottom:18px}
+  .grid{display:grid;gap:14px}
+  .grid-2{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:900px){.grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}}
+
+  label{display:block;font-size:11px;color:var(--sub);letter-spacing:.1em;margin-bottom:6px;font-weight:600}
+  input.fld,select.fld,textarea.fld{
+    width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--card-border);
+    background:rgba(0,0,0,0.3);color:var(--text);font-family:inherit;font-size:14px;transition:.2s;
+  }
+  input.fld:focus,select.fld:focus,textarea.fld:focus{
+    outline:none;border-color:var(--blue);background:rgba(0,0,0,0.45);
+    box-shadow:0 0 0 3px rgba(14,165,233,0.18);
+  }
+  .input-suffix{position:relative}
+  .input-suffix .sfx{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--sub);pointer-events:none}
+
+  /* Buttons */
+  .btn{
+    padding:12px 22px;border-radius:12px;border:none;font-family:inherit;font-weight:700;font-size:14px;
+    cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:8px;
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;box-shadow:0 6px 20px rgba(14,165,233,0.35)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(14,165,233,0.45)}
+  .btn-ghost{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--card-border)}
+  .btn-ghost:hover{background:rgba(255,255,255,0.12)}
+  .btn-green{background:linear-gradient(135deg,var(--green),#059669);color:#fff;box-shadow:0 6px 20px rgba(16,185,129,0.35)}
+  .btn-red{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+  .actions{display:flex;justify-content:space-between;gap:12px;margin-top:18px}
+
+  /* ===== Upload area ===== */
+  .drop{
+    border:2px dashed rgba(14,165,233,0.35);border-radius:14px;
+    padding:30px;text-align:center;color:var(--sub);cursor:pointer;transition:.2s;
+    background:rgba(14,165,233,0.04);
+  }
+  .drop:hover,.drop.over{border-color:var(--blue);background:rgba(14,165,233,0.12);color:var(--text)}
+  .drop .icon{font-size:36px;margin-bottom:6px}
+  .drop .ttl{font-weight:700;font-size:15px;color:var(--text);margin-bottom:4px}
+  .drop .hint{font-size:11px}
+  .file-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(14,165,233,0.12);color:var(--blue);font-size:12px;margin:4px}
+
+  /* ===== Table ===== */
+  table.rr{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  table.rr th,table.rr td{padding:8px;border-bottom:1px solid var(--card-border)}
+  table.rr th{font-size:11px;color:var(--sub);letter-spacing:.1em;text-align:left;font-weight:600;background:rgba(255,255,255,0.03)}
+  table.rr td input{width:100%;padding:8px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;font-size:13px}
+  table.rr td input:focus{outline:none;border-color:var(--blue);background:rgba(0,0,0,0.4)}
+  table.rr td.right input{text-align:right}
+  .row-add{padding:10px;text-align:center;color:var(--blue);cursor:pointer;border-radius:10px;background:rgba(14,165,233,0.06);border:1px dashed rgba(14,165,233,0.3);margin-top:8px}
+  .row-add:hover{background:rgba(14,165,233,0.12)}
+  .del-btn{background:rgba(239,68,68,0.1);color:var(--red);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px}
+
+  /* ===== Result ===== */
+  .price-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+  .price-card{
+    padding:22px;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));
+    border:1px solid var(--card-border);text-align:center;position:relative;overflow:hidden;
+  }
+  .price-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--mute)}
+  .price-card.up::before{background:var(--green)}
+  .price-card.mid::before{background:var(--blue)}
+  .price-card.low::before{background:var(--orange)}
+  .price-card .label{font-size:11px;color:var(--sub);letter-spacing:.2em;margin-bottom:6px}
+  .price-card .price{font-size:30px;font-weight:900;font-family:Inter;letter-spacing:-.02em}
+  .price-card .yld{font-size:12px;color:var(--sub);margin-top:6px}
+  .price-card.mid .price{color:var(--blue)}
+  .price-card.up .price{color:var(--green)}
+  .price-card.low .price{color:var(--orange)}
+
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+  .kpi .k{padding:14px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)}
+  .kpi .k .lbl{font-size:10px;color:var(--sub);letter-spacing:.15em;margin-bottom:4px}
+  .kpi .k .val{font-size:18px;font-weight:800;font-family:Inter}
+  .kpi .k.blue .val{color:var(--blue)}
+  .kpi .k.green .val{color:var(--green)}
+  .kpi .k.orange .val{color:var(--orange)}
+
+  .pnl{width:100%;border-collapse:collapse;font-size:13px}
+  .pnl td,.pnl th{padding:9px 12px;border-bottom:1px dashed var(--card-border)}
+  .pnl th{text-align:left;color:var(--sub);font-weight:600;font-size:11px;letter-spacing:.1em}
+  .pnl td.num{text-align:right;font-family:Inter;font-weight:600}
+  .pnl tr.total td{border-top:2px solid var(--blue);font-weight:800;color:var(--blue);font-size:14px}
+  .pnl tr.subtotal td{font-weight:700}
+
+  /* ===== Loading ===== */
+  .ai-loading{display:flex;flex-direction:column;align-items:center;padding:40px;gap:14px}
+  .ai-spinner{
+    width:64px;height:64px;border-radius:50%;
+    border:4px solid rgba(14,165,233,0.2);border-top-color:var(--blue);
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ai-msg{color:var(--sub);font-size:13px;text-align:center}
+  .ai-msg b{color:var(--blue)}
+
+  /* ===== Chart wrapper ===== */
+  .chart-wrap{background:rgba(255,255,255,0.02);border:1px solid var(--card-border);border-radius:12px;padding:16px;height:280px}
+
+  .tag{display:inline-block;padding:4px 10px;border-radius:99px;font-size:11px;margin:2px 4px 2px 0}
+  .tag.risk{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+  .tag.strength{background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.3)}
+
+  .hide{display:none !important}
+
+  /* ===== PDF Report (offscreen) — A4縦 794×1123px @96dpi ===== */
+  #reportRoot{position:absolute;left:-99999px;top:0;width:794px;background:#fff;color:#1a1a2e;font-family:"Noto Sans JP",sans-serif;line-height:1.5}
+  .pdf-page{width:794px;height:1123px;padding:48px 44px 48px;background:#fff;color:#1a1a2e;page-break-after:always;position:relative;box-sizing:border-box;overflow:hidden}
+  .pdf-page h1{font-size:20px;color:#0a1226;border-bottom:2px solid #0ea5e9;padding-bottom:6px;margin:0 0 12px;letter-spacing:.02em}
+  .pdf-page h2{font-size:13px;color:#0a1226;margin:12px 0 6px;border-left:3px solid #0ea5e9;padding-left:8px;letter-spacing:.04em}
+  .pdf-page h3{font-size:11px;color:#475569;margin:8px 0 4px;font-weight:600}
+  .pdf-page p,.pdf-page div,.pdf-page td,.pdf-page th,.pdf-page li{line-height:1.5}
+
+  .pdf-cover-title{font-size:30px;font-weight:900;letter-spacing:.02em;color:#0a1226;text-align:center;margin:30px 0 4px}
+  .pdf-cover-sub{text-align:center;color:#64748b;font-size:12px;margin-bottom:18px}
+  .pdf-cover-meta{display:table;width:100%;border-collapse:separate;border-spacing:4px;font-size:11px;margin-top:14px;padding:12px;background:#f5f7fa;border-radius:8px;table-layout:fixed}
+  .pdf-cover-meta>div{display:table-row}
+  .pdf-cover-meta .lbl{display:table-cell;width:120px;color:#64748b;font-weight:600;padding:2px 8px}
+  .pdf-cover-meta .val{display:table-cell;padding:2px 8px}
+
+  .pdf-price-row{display:table;width:100%;border-spacing:8px;margin:14px 0;table-layout:fixed}
+  .pdf-price-card{display:table-cell;width:33%;padding:12px 8px;border-radius:8px;text-align:center;border:1px solid #e2e8f0;vertical-align:top}
+  .pdf-price-card.up{border-top:3px solid #10b981;background:#ecfdf5}
+  .pdf-price-card.mid{border-top:3px solid #0ea5e9;background:#eff6ff}
+  .pdf-price-card.low{border-top:3px solid #f59e0b;background:#fffbeb}
+  .pdf-price-card .lbl{font-size:10px;color:#64748b;font-weight:600;letter-spacing:.1em}
+  .pdf-price-card .val{font-size:18px;font-weight:900;color:#0a1226;margin:4px 0}
+  .pdf-price-card .yld{font-size:10px;color:#64748b}
+
+  .pdf-table{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0}
+  .pdf-table th,.pdf-table td{padding:4px 6px;border:1px solid #e2e8f0;text-align:left;vertical-align:top}
+  .pdf-table th{background:#0a1226;color:#fff;font-weight:600;font-size:10px}
+  .pdf-table td.num{text-align:right;font-family:Inter;font-variant-numeric:tabular-nums}
+  .pdf-table tr.total td{background:#eff6ff;font-weight:800;color:#0a1226;border-top:2px solid #0ea5e9}
+
+  .pdf-footer{position:absolute;bottom:18px;left:44px;right:44px;display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:6px}
+
+  .pdf-grid-2{display:table;width:100%;border-spacing:8px;table-layout:fixed;margin:4px 0}
+  .pdf-grid-2 > div{display:table-cell;width:50%;vertical-align:top}
+
+  .pdf-callout{padding:8px 10px;border-radius:6px;background:#f5f7fa;border-left:3px solid #0ea5e9;font-size:10px;line-height:1.6;margin:4px 0}
+  .pdf-tag{display:inline-block;padding:2px 6px;border-radius:99px;font-size:9px;margin:1px}
+  .pdf-tag.risk{background:#fee2e2;color:#b91c1c}
+  .pdf-tag.strength{background:#d1fae5;color:#065f46}
+
+  .pdf-kpi-row{display:table;width:100%;border-spacing:6px;table-layout:fixed;margin:6px 0}
+  .pdf-kpi{display:table-cell;padding:8px;background:#f5f7fa;border-radius:6px;text-align:center;vertical-align:middle}
+  .pdf-kpi .l{font-size:9px;color:#64748b;letter-spacing:.05em}
+  .pdf-kpi .v{font-size:14px;font-weight:800;color:#0a1226;font-family:Inter;margin-top:2px}
+
+  /* ===== 物件概要書 (A4縦) ===== */
+  .gaiyou-sheet{width:210mm;min-height:297mm;background:#fff;color:#1a1a2e;padding:14mm 14mm;font-family:"Noto Sans JP",sans-serif;font-size:10pt;line-height:1.5;margin:0 auto;box-sizing:border-box}
+  .g-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0a1226;padding-bottom:6px;margin-bottom:10px}
+  .g-corp-name{font-size:13pt;font-weight:900;color:#0a1226;letter-spacing:.05em}
+  .g-corp-sub{font-size:8pt;color:#64748b;letter-spacing:.15em}
+  .g-title{font-size:18pt;font-weight:900;letter-spacing:.4em;color:#0a1226}
+  .g-date{font-size:9pt;color:#64748b}
+  .g-title-box{font-size:16pt;font-weight:900;color:#0a1226;background:#eff6ff;padding:8px 14px;border-left:5px solid #0ea5e9;margin:10px 0 4px}
+  .g-addr-box{font-size:10pt;color:#475569;padding:4px 14px 10px}
+  .g-section-title{font-size:11pt;font-weight:700;color:#0a1226;border-left:4px solid #0ea5e9;padding-left:8px;margin:10px 0 4px}
+  .g-table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:4px}
+  .g-table th,.g-table td{border:1px solid #cbd5e1;padding:5px 8px;text-align:left;vertical-align:top}
+  .g-table th{background:#f1f5f9;font-weight:600;color:#475569;width:22%}
+  .g-table td.r{text-align:right;font-variant-numeric:tabular-nums}
+  .g-table .g-price{font-size:13pt;font-weight:900;color:#0ea5e9}
+  .g-table .g-price-mini{font-weight:800;color:#10b981}
+  .g-table tr.g-total td{background:#eff6ff;font-weight:800;color:#0a1226;border-top:2px solid #0ea5e9}
+  .g-foot{margin-top:14px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8pt;color:#64748b;line-height:1.6;text-align:center}
+
+  @media print{
+    @page{size:A4 portrait;margin:0}
+    body{background:#fff !important;color:#000 !important;margin:0;padding:0}
+    body.print-gaiyou *{visibility:hidden}
+    body.print-gaiyou .view-gaiyou,
+    body.print-gaiyou .view-gaiyou *{visibility:visible}
+    body.print-gaiyou .view-gaiyou{position:absolute;left:0;top:0;width:100%;margin:0;padding:0}
+    body.print-gaiyou .no-print{display:none !important}
+    body.print-gaiyou .wrap{padding:0 !important;max-width:none}
+    .gaiyou-sheet{width:210mm;min-height:297mm;page-break-after:always;box-shadow:none;margin:0}
+    .no-print{display:none !important}
+    .card{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== Top Bar ===== -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="badge">住</div>
+      <div>
+        <div class="title">株式会社 住まっぷ</div>
+        <div class="subtitle">収益物件 AI 査定シミュレーター</div>
+      </div>
+    </div>
+    <nav class="topnav">
+      <a class="nav-link active" data-view="home">🏠 トップ</a>
+      <a class="nav-link" data-view="simulator">📊 シミュレーター</a>
+      <a class="nav-link" data-view="list">📋 物件登録一覧</a>
+    </nav>
+    <div class="api-panel">
+      <span class="pill" id="apiStatus">Claude: 未設定</span>
+      <input type="password" id="apiKey" placeholder="Claude API Key" autocomplete="off" style="width:160px;font-family:monospace;font-size:11px" />
+      <span class="pill" id="driveStatus">Drive: 未設定</span>
+      <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px" />
+      <button class="btn btn-ghost" id="saveKey" style="padding:6px 10px;font-size:11px">保存</button>
+      <button class="btn btn-ghost" id="toggleKey" style="padding:6px 8px;font-size:11px" title="表示/非表示">👁</button>
+      <button class="btn btn-ghost" id="openGlossary" style="padding:6px 8px;font-size:11px" title="不動産投資 用語集">📖</button>
+      <button class="btn btn-red" id="clearData" style="padding:6px 8px;font-size:11px" title="現在の編集中データのみクリア（APIキー・登録物件は保持）">🗑</button>
+    </div>
+  </header>
+
+  <!-- ===== HOME VIEW ===== -->
+  <section class="view view-home">
+    <div class="card" style="text-align:center;padding:48px 24px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(139,92,246,0.08))">
+      <div style="font-size:48px;margin-bottom:8px">🏢</div>
+      <h2 style="font-size:28px;margin-bottom:8px;letter-spacing:.04em">株式会社 住まっぷ</h2>
+      <div style="color:var(--sub);font-size:14px;margin-bottom:32px">収益物件 AI 査定シミュレーター</div>
+      <div class="grid grid-2" style="max-width:760px;margin:0 auto">
+        <a class="nav-card" data-view="simulator" style="text-decoration:none">
+          <div style="font-size:36px">📊</div>
+          <div class="nav-card-title">査定シミュレーター</div>
+          <div class="nav-card-desc">物件情報・レントロール・経費を入力してAIで査定。<br>3パターン価格・将来予測・PDFレポート出力</div>
+        </a>
+        <a class="nav-card" data-view="list" style="text-decoration:none">
+          <div style="font-size:36px">📋</div>
+          <div class="nav-card-title">物件登録一覧</div>
+          <div class="nav-card-desc">登録済みの物件を一覧表示。<br>編集・複製・物件概要書出力・削除</div>
+        </a>
+      </div>
+      <div style="margin-top:30px;font-size:11px;color:var(--sub)">最終更新: <span id="homeStat">—</span></div>
+    </div>
+  </section>
+
+  <!-- ===== SIMULATOR VIEW ===== -->
+  <section class="view view-simulator hide">
+  <!-- ===== Stepper ===== -->
+  <div class="stepper" id="stepper">
+    <div class="step active" data-step="1"><div class="num">1</div><div><div class="sublbl">STEP 1</div><div class="lbl">物件基本情報</div></div></div>
+    <div class="step" data-step="2"><div class="num">2</div><div><div class="sublbl">STEP 2</div><div class="lbl">レントロール</div></div></div>
+    <div class="step" data-step="3"><div class="num">3</div><div><div class="sublbl">STEP 3</div><div class="lbl">経費・条件設定</div></div></div>
+    <div class="step" data-step="4"><div class="num">4</div><div><div class="sublbl">STEP 4</div><div class="lbl">AI相場調査</div></div></div>
+    <div class="step" data-step="5"><div class="num">5</div><div><div class="sublbl">STEP 5</div><div class="lbl">査定結果・レポート</div></div></div>
+  </div>
+
+  <!-- ===== STEP 1 ===== -->
+  <section class="card step-panel" data-panel="1">
+    <h2>STEP 1 — 物件基本情報</h2>
+    <p class="desc">物件の基本スペックを入力してください。謄本・公図・レントロールをアップロードするとAIが自動で読み取ります。</p>
+
+    <!-- Google Drive Folder Import -->
+    <div style="margin-bottom:18px;padding:18px;border-radius:14px;background:linear-gradient(135deg,rgba(66,133,244,0.10),rgba(52,168,83,0.10));border:1px solid rgba(66,133,244,0.3)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:22px">📁</span>
+        <div>
+          <div style="font-weight:700;font-size:14px">Google Drive フォルダから一括取込</div>
+          <div style="font-size:11px;color:var(--sub)">物件資料・謄本・公図・レントロールを格納したフォルダのリンクを貼ると、AIが全ファイルを解析して物件情報とレントロールを自動入力します</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" class="fld" id="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/XXXXXXXX..." style="flex:1" />
+        <button class="btn btn-primary" id="btnDriveFetch">📥 フォルダから読込</button>
+      </div>
+      <div id="driveFiles" style="margin-top:10px"></div>
+      <div style="margin-top:10px;font-size:10px;color:var(--sub);line-height:1.6">
+        ※ フォルダは「リンクを知っている全員」が閲覧可能に設定してください<br>
+        ※ Google Drive APIキーが必要です（画面右上に登録／<a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--blue)">Google Cloud Consoleで発行</a>）
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:18px">
+      <div class="drop" id="dropDeed">
+        <div class="icon">📄</div>
+        <div class="ttl">謄本・公図をアップロード</div>
+        <div class="hint">PDF / JPG / PNG（クリック or ドラッグ&ドロップ）</div>
+        <input type="file" id="fileDeed" accept=".pdf,.jpg,.jpeg,.png" multiple class="hide" />
+        <div id="deedFiles"></div>
+      </div>
+      <div class="drop" id="dropMap">
+        <div class="icon">🗺️</div>
+        <div class="ttl">図面・物件資料をアップロード</div>
+        <div class="hint">マイソク / 図面 / 公図など</div>
+        <input type="file" id="fileMap" accept=".pdf,.jpg,.jpeg,.png" multiple class="hide" />
+        <div id="mapFiles"></div>
+      </div>
+    </div>
+
+    <div class="actions" style="justify-content:flex-end;margin-bottom:18px">
+      <button class="btn btn-green" id="btnOcrBasic">🤖 AIで自動入力</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <label>物件名</label>
+        <input type="text" class="fld" id="propName" placeholder="例：D'sアセット種子島レジデンス" />
+      </div>
+      <div>
+        <label>郵便番号</label>
+        <input type="text" class="fld" id="propZip" placeholder="891-3101" />
+      </div>
+    </div>
+    <div class="grid grid-3" style="margin-top:14px">
+      <div>
+        <label>都道府県</label>
+        <input type="text" class="fld" id="propPref" placeholder="鹿児島県" />
+      </div>
+      <div>
+        <label>市区町村</label>
+        <input type="text" class="fld" id="propCity" placeholder="西之表市" />
+      </div>
+      <div>
+        <label>番地・建物名</label>
+        <input type="text" class="fld" id="propAddr" placeholder="〇〇1-2-3" />
+      </div>
+    </div>
+    <!-- 住所からエリア情報AI調査 -->
+    <div style="margin-top:18px;padding:18px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.10),rgba(14,165,233,0.10));border:1px solid rgba(139,92,246,0.3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+        <div>
+          <div style="font-weight:700;font-size:14px">🔍 住所からエリア情報をAI調査</div>
+          <div style="font-size:11px;color:var(--sub)">所在地に基づき、用途地域・建ぺい率/容積率・接道状況・ライフライン・規制を自動取得</div>
+        </div>
+        <button class="btn btn-primary" id="btnAreaInfo">📡 エリア情報を調査</button>
+      </div>
+      <div id="areaInfoResult" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 土地（複数筆対応） -->
+    <h3 style="margin-top:24px;font-size:14px;color:var(--blue);letter-spacing:.1em">▼ 土地（複数筆対応）</h3>
+    <p style="font-size:11px;color:var(--sub);margin:4px 0 10px">謄本記載の地番・地目・面積を入力してください。複数筆ある場合は行を追加できます。</p>
+    <div style="overflow-x:auto">
+      <table class="rr" id="landTable">
+        <thead>
+          <tr>
+            <th style="width:160px">地番</th>
+            <th style="width:140px">地目</th>
+            <th style="width:140px">面積（㎡）</th>
+            <th>備考</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="landBody"></tbody>
+      </table>
+    </div>
+    <div class="row-add" id="addLand">＋ 筆を追加</div>
+    <div class="kpi" style="margin-top:12px;grid-template-columns:repeat(2,1fr)">
+      <div class="k blue"><div class="lbl">土地 合計面積</div><div class="val" id="landTotal">0.00 ㎡</div></div>
+      <div class="k"><div class="lbl">坪換算</div><div class="val" id="landTsubo">0.00 坪</div></div>
+    </div>
+
+    <!-- 建物（複数棟対応） -->
+    <h3 style="margin-top:24px;font-size:14px;color:var(--blue);letter-spacing:.1em">▼ 建物（複数棟対応）</h3>
+    <p style="font-size:11px;color:var(--sub);margin:4px 0 10px">建物が2棟以上ある場合は行を追加してください。代表構造は延床最大棟、築年数は最古棟で計算します。戸数はレントロール（STEP2）から自動集計します。</p>
+    <div style="overflow-x:auto">
+      <table class="rr" id="bldgTable">
+        <thead>
+          <tr>
+            <th style="width:130px">建物名/種類</th>
+            <th style="width:130px">構造</th>
+            <th style="width:90px">築年</th>
+            <th style="width:140px">延床面積（㎡）</th>
+            <th>備考</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="bldgBody"></tbody>
+      </table>
+    </div>
+    <div class="row-add" id="addBldg">＋ 棟を追加</div>
+    <div class="kpi" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+      <div class="k green"><div class="lbl">建物 合計延床</div><div class="val" id="bldgFloorTotal">0.00 ㎡</div></div>
+      <div class="k"><div class="lbl">代表 構造</div><div class="val" id="bldgMainStruct" style="font-size:14px">-</div></div>
+      <div class="k"><div class="lbl">築年数（最古）</div><div class="val" id="bldgAge">-</div></div>
+    </div>
+
+    <div class="actions">
+      <div></div>
+      <button class="btn btn-primary" data-go="2">STEP 2 へ進む →</button>
+    </div>
+  </section>
+
+  <!-- ===== STEP 2 ===== -->
+  <section class="card step-panel hide" data-panel="2">
+    <h2>STEP 2 — レントロール・現況</h2>
+    <p class="desc">現況・駐車場・レントロールを入力してください。レントロールPDF/Excel/CSVをアップロードでAI自動入力も可能です。</p>
+
+    <!-- 現況・駐車場 -->
+    <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:8px 0 8px">▼ 現況・駐車場</h3>
+    <div class="grid grid-3" style="margin-bottom:18px">
+      <div>
+        <label>現況</label>
+        <select class="fld" id="propStatus">
+          <option value="満室">満室</option>
+          <option value="一部空室">一部空室</option>
+          <option value="全空">全空</option>
+        </select>
+      </div>
+      <div>
+        <label>駐車場 台数</label>
+        <div class="input-suffix"><input type="number" class="fld" id="propPark" placeholder="6" /><span class="sfx">台</span></div>
+      </div>
+      <div>
+        <label>駐車場 月額（1台あたり）</label>
+        <div class="input-suffix"><input type="text" class="fld money" id="propParkFee" placeholder="5,000" /><span class="sfx">円/月</span></div>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:8px 0 8px">▼ レントロール</h3>
+    <div class="drop" id="dropRR" style="margin-bottom:18px">
+      <div class="icon">📊</div>
+      <div class="ttl">レントロールをアップロード</div>
+      <div class="hint">PDF / Excel / CSV（AIが自動で抽出します）</div>
+      <input type="file" id="fileRR" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="hide" />
+      <div id="rrFiles"></div>
+    </div>
+
+    <div class="actions" style="justify-content:flex-end;margin-bottom:12px;gap:8px">
+      <button class="btn btn-green" id="btnOcrRR">🤖 AIで自動入力</button>
+      <button class="btn btn-primary" id="btnWebFillRR" title="空欄補完 / レントロール無ならWeb募集情報から仮作成">🔍 間取り/面積をWeb調査</button>
+      <button class="btn btn-ghost" id="btnSanitizeRR" title="既存の長文備考・無効URLを一括クリーンアップ">🧹 備考クリーン</button>
+    </div>
+    <div id="webFillResult" style="margin-bottom:12px"></div>
+
+    <div style="overflow-x:auto">
+      <table class="rr" id="rrTable">
+        <thead>
+          <tr>
+            <th style="width:90px">部屋番号</th>
+            <th style="width:90px">間取り</th>
+            <th style="width:90px">専有㎡</th>
+            <th style="width:120px">月額賃料</th>
+            <th style="width:100px">管理費</th>
+            <th style="width:70px">空室</th>
+            <th>備考</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="rrBody"></tbody>
+      </table>
+    </div>
+    <div class="row-add" id="addRow">＋ 行を追加</div>
+
+    <div class="kpi" style="margin-top:18px;grid-template-columns:repeat(5,1fr)">
+      <div class="k blue"><div class="lbl">総戸数（自動）</div><div class="val" id="rrUnits">0 戸</div></div>
+      <div class="k"><div class="lbl">入居 / 総戸数</div><div class="val" id="rrOcc">0 / 0</div></div>
+      <div class="k blue"><div class="lbl">満室想定 月額</div><div class="val" id="rrFullMonth">¥0</div></div>
+      <div class="k green"><div class="lbl">満室想定 年額（GPI）</div><div class="val" id="rrFullYear">¥0</div></div>
+      <div class="k orange"><div class="lbl">現況 月額（空室除く）</div><div class="val" id="rrCurMonth">¥0</div></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" data-go="1">← STEP 1 へ戻る</button>
+      <button class="btn btn-primary" data-go="3">STEP 3 へ進む →</button>
+    </div>
+  </section>
+
+  <!-- ===== STEP 3 ===== -->
+  <section class="card step-panel hide" data-panel="3">
+    <h2>STEP 3 — 経費・条件設定</h2>
+    <p class="desc">年間経費と査定条件を入力してください。空欄項目はゼロとして計算します。</p>
+
+    <!-- 経費・税金 アップロード（2カラム） -->
+    <div class="grid grid-2" style="margin-bottom:18px">
+      <!-- 管理会社報告書 -->
+      <div style="padding:16px;border-radius:14px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(16,185,129,0.10));border:1px solid rgba(245,158,11,0.3)">
+        <div style="margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px">📊 管理会社 収支報告書</div>
+          <div style="font-size:10px;color:var(--sub)">管理手数料・修繕費・点検費・保険料・その他経費を抽出</div>
+        </div>
+        <div class="drop" id="dropExp" style="border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.05);padding:18px">
+          <div class="icon" style="font-size:28px">📑</div>
+          <div class="ttl" style="font-size:13px">月次・年間収支報告書</div>
+          <div class="hint">PDF / JPG / PNG / Excel</div>
+          <input type="file" id="fileExp" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv" multiple class="hide" />
+          <div id="expFiles"></div>
+        </div>
+        <div class="actions" style="justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-green" id="btnOcrExp" style="padding:8px 14px;font-size:12px">🤖 AIで経費抽出</button>
+        </div>
+        <div id="expResult"></div>
+      </div>
+
+      <!-- 固定資産税納税通知書 -->
+      <div style="padding:16px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.10),rgba(14,165,233,0.10));border:1px solid rgba(139,92,246,0.3)">
+        <div style="margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px">🏛 固定資産税 納税通知書</div>
+          <div style="font-size:10px;color:var(--sub)">固定資産税・都市計画税・課税標準額を抽出</div>
+        </div>
+        <div class="drop" id="dropTax" style="border-color:rgba(139,92,246,0.4);background:rgba(139,92,246,0.05);padding:18px">
+          <div class="icon" style="font-size:28px">🏛</div>
+          <div class="ttl" style="font-size:13px">固定資産税納税通知書</div>
+          <div class="hint">PDF / JPG / PNG（自治体発行）</div>
+          <input type="file" id="fileTax" accept=".pdf,.jpg,.jpeg,.png" multiple class="hide" />
+          <div id="taxFiles"></div>
+        </div>
+        <div class="actions" style="justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-green" id="btnOcrTax" style="padding:8px 14px;font-size:12px">🤖 AIで税額抽出</button>
+        </div>
+        <div id="taxResult"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-3">
+      <div><label>管理委託費率</label><div class="input-suffix"><input type="number" class="fld" id="opMgmt" value="5" step="0.1" /><span class="sfx">%</span></div></div>
+      <div><label>修繕積立金</label><div class="input-suffix"><input type="text" class="fld money" id="opRepair" placeholder="20,000" /><span class="sfx">円/月</span></div></div>
+      <div><label>固定資産税・都市計画税</label><div class="input-suffix"><input type="text" class="fld money" id="opTax" placeholder="350,000" /><span class="sfx">円/年</span></div></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:14px">
+      <div><label>火災・地震保険料</label><div class="input-suffix"><input type="text" class="fld money" id="opIns" placeholder="80,000" /><span class="sfx">円/年</span></div></div>
+      <div><label>その他経費</label><div class="input-suffix"><input type="text" class="fld money" id="opEtc" placeholder="0" /><span class="sfx">円/年</span></div></div>
+      <div><label>想定空室率</label><div class="input-suffix"><input type="number" class="fld" id="opVacancy" value="5" step="0.5" /><span class="sfx">%</span></div></div>
+    </div>
+
+    <h3 style="margin-top:24px;font-size:14px;color:var(--sub);letter-spacing:.1em">▼ 査定パラメータ（任意・上書き可）</h3>
+    <div class="grid grid-3" style="margin-top:8px">
+      <div><label>想定キャップレート（中央値）</label><div class="input-suffix"><input type="number" class="fld" id="capMid" value="8.0" step="0.1" /><span class="sfx">%</span></div></div>
+      <div><label>強気（下限）</label><div class="input-suffix"><input type="number" class="fld" id="capMin" value="7.0" step="0.1" /><span class="sfx">%</span></div></div>
+      <div><label>保守（上限）</label><div class="input-suffix"><input type="number" class="fld" id="capMax" value="9.5" step="0.1" /><span class="sfx">%</span></div></div>
+    </div>
+
+    <div class="grid grid-3" style="margin-top:14px">
+      <div><label>DCF 割引率</label><div class="input-suffix"><input type="number" class="fld" id="dcfRate" value="6.0" step="0.1" /><span class="sfx">%</span></div></div>
+      <div><label>年間賃料下落率</label><div class="input-suffix"><input type="number" class="fld" id="rentDrop" value="0.8" step="0.1" /><span class="sfx">%/年</span></div></div>
+      <div><label>査定者名</label><input type="text" class="fld" id="evalName" placeholder="査定者名" /></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" data-go="2">← STEP 2 へ戻る</button>
+      <button class="btn btn-primary" data-go="4">STEP 4 へ進む →</button>
+    </div>
+  </section>
+
+  <!-- ===== STEP 4 ===== -->
+  <section class="card step-panel hide" data-panel="4">
+    <h2>STEP 4 — AI相場調査</h2>
+    <p class="desc">Claude APIが周辺類似物件の相場利回り・㎡単価・エリア動向を調査します。</p>
+
+    <div id="aiLoad" class="ai-loading hide">
+      <div class="ai-spinner"></div>
+      <div class="ai-msg"><b id="aiMsg">Claude APIに問い合わせ中…</b><br>周辺類似物件の相場帯を取得しています</div>
+    </div>
+
+    <div id="aiResult" class="hide">
+      <div class="kpi">
+        <div class="k blue"><div class="lbl">相場CAP RATE 中央値</div><div class="val" id="mkCapMid">-</div></div>
+        <div class="k green"><div class="lbl">CAP RATE 下限〜上限</div><div class="val" id="mkCapRng">-</div></div>
+        <div class="k orange"><div class="lbl">推定空室率</div><div class="val" id="mkVac">-</div></div>
+        <div class="k"><div class="lbl">㎡単価 中央値</div><div class="val" id="mkSqm">-</div></div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:14px">
+        <div class="card" style="margin:0">
+          <h3 style="font-size:13px;color:var(--green);margin-bottom:8px">▲ エリア強み</h3>
+          <div id="mkStrength"></div>
+        </div>
+        <div class="card" style="margin:0">
+          <h3 style="font-size:13px;color:var(--red);margin-bottom:8px">▼ リスク要因</h3>
+          <div id="mkRisk"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--blue);margin-bottom:8px">📍 エリア動向</h3>
+        <div id="mkTrend" style="font-size:13px;line-height:1.7;color:var(--text)"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--blue);margin-bottom:8px">💡 利回り設定根拠</h3>
+        <div id="mkComment" style="font-size:13px;line-height:1.7;color:var(--text)"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" data-go="3">← STEP 3 へ戻る</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-green" id="btnFetchMarket">🤖 AI相場調査を実行</button>
+        <button class="btn btn-primary" data-go="5">STEP 5 へ進む →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== STEP 5 ===== -->
+  <section class="card step-panel hide" data-panel="5">
+    <h2>STEP 5 — 査定結果・レポート</h2>
+    <p class="desc">2モデル（収益還元法 + 相場価格）による査定結果です。A4 PDFレポート出力も可能です。</p>
+
+    <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:8px 0 4px">▼ MODEL A — 収益還元法 査定価格</h3>
+    <div class="price-row">
+      <div class="price-card up"><div class="label">上振れ値（強気）</div><div class="price" id="rsUp">¥0</div><div class="yld" id="rsUpY">CAP -% / 想定NOI -</div></div>
+      <div class="price-card mid"><div class="label">査定中央値（標準）</div><div class="price" id="rsMid">¥0</div><div class="yld" id="rsMidY">CAP -% / 想定NOI -</div></div>
+      <div class="price-card low"><div class="label">下限値（保守）</div><div class="price" id="rsLow">¥0</div><div class="yld" id="rsLowY">CAP -% / 想定NOI -</div></div>
+    </div>
+
+    <div class="kpi">
+      <div class="k blue"><div class="lbl">満室想定 表面利回り</div><div class="val" id="rsGY">-</div></div>
+      <div class="k green"><div class="lbl">現況 表面利回り</div><div class="val" id="rsCY">-</div></div>
+      <div class="k orange"><div class="lbl">NOI 利回り</div><div class="val" id="rsNOIY">-</div></div>
+      <div class="k"><div class="lbl">投資回収年数(中央値)</div><div class="val" id="rsPB">-</div></div>
+    </div>
+
+    <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:18px 0 4px">▼ MODEL B — 相場価格モデル（参考）</h3>
+    <div class="price-row">
+      <div class="price-card up"><div class="label">㎡単価 下限</div><div class="price" id="rsMbLow">¥0</div><div class="yld" id="rsMbLowU">- 万円/㎡</div></div>
+      <div class="price-card mid"><div class="label">㎡単価 中央値</div><div class="price" id="rsMbMid">¥0</div><div class="yld" id="rsMbMidU">- 万円/㎡</div></div>
+      <div class="price-card low"><div class="label">㎡単価 上限</div><div class="price" id="rsMbHigh">¥0</div><div class="yld" id="rsMbHighU">- 万円/㎡</div></div>
+    </div>
+
+    <div class="card" style="margin:14px 0">
+      <h3 style="font-size:13px;color:var(--blue);margin-bottom:8px">📊 モデル乖離分析</h3>
+      <div id="rsCompare" style="font-size:13px;line-height:1.7"></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div>
+        <h3 style="font-size:13px;color:var(--sub);letter-spacing:.1em;margin:14px 0 8px">▼ 年間収支（中央値ベース）</h3>
+        <table class="pnl" id="pnlTable"></table>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:var(--sub);letter-spacing:.1em;margin:14px 0 8px">▼ 将来利回り予測（10年）</h3>
+        <div class="chart-wrap"><canvas id="chartFuture"></canvas></div>
+        <div id="futureReport" style="margin-top:10px;padding:12px;border-radius:10px;background:rgba(14,165,233,0.06);border:1px solid rgba(14,165,233,0.25);font-size:11px;line-height:1.7">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-weight:700;color:var(--blue);font-size:12px">📈 将来予測レポート</div>
+            <button class="btn btn-ghost" id="btnFutureAI" style="padding:4px 10px;font-size:10px" title="物件特性に基づいたAI詳細所感を生成">🤖 AI詳細解説</button>
+          </div>
+          <div id="futureBasic"></div>
+          <div id="futureAI" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:14px">
+      <div>
+        <h3 style="font-size:13px;color:var(--sub);letter-spacing:.1em;margin:14px 0 8px">▼ 周辺相場CAP RATE 帯</h3>
+        <div class="chart-wrap"><canvas id="chartCap"></canvas></div>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:var(--sub);letter-spacing:.1em;margin:14px 0 8px">▼ ㎡単価 相場帯</h3>
+        <div class="chart-wrap"><canvas id="chartSqm"></canvas></div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px">
+      <label>査定者コメント（PDFに反映）</label>
+      <textarea class="fld" id="evalComment" rows="3" placeholder="例：本物件は満室稼働中で、周辺相場と比較しても利回り水準は妥当。築古ながら直近大規模修繕済みで当面の追加修繕負担は限定的と判断。"></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" data-go="4">← STEP 4 へ戻る</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="btnRecalc">🔄 再計算</button>
+        <button class="btn btn-primary" id="btnSaveProperty">💾 物件を登録/更新</button>
+        <button class="btn btn-ghost" id="btnGaiyou">📄 物件概要書を作成</button>
+        <button class="btn btn-green" id="btnPdf">📄 A4 PDFレポート出力</button>
+      </div>
+    </div>
+  </section>
+  </section><!-- /view-simulator -->
+
+  <!-- ===== LIST VIEW ===== -->
+  <section class="view view-list hide">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <h2>📋 物件登録一覧</h2>
+          <p class="desc" style="margin:4px 0 0">登録された物件の一覧。編集・複製・物件概要書作成・削除が行えます。</p>
+        </div>
+        <button class="btn btn-primary" id="btnNewProperty">＋ 新規物件作成</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="prop-table" id="propTable">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>物件名</th>
+              <th>所在地</th>
+              <th>構造/築年</th>
+              <th style="text-align:right">戸数</th>
+              <th style="text-align:right">査定中央値</th>
+              <th>登録日時</th>
+              <th style="width:280px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="propTableBody"></tbody>
+        </table>
+      </div>
+      <div id="propEmpty" style="text-align:center;padding:40px;color:var(--sub);font-size:13px;display:none">
+        登録物件がまだありません。「シミュレーター」で物件を査定 → 「💾 物件を登録/更新」を押すと一覧に追加されます。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GAIYOU VIEW (物件概要書 - A4縦印刷専用) ===== -->
+  <section class="view view-gaiyou hide">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px" class="no-print">
+      <h2 style="color:var(--text)">📄 物件概要書</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
+        <button class="btn btn-green" onclick="window.print()">🖨 印刷 / PDF保存</button>
+      </div>
+    </div>
+    <div id="gaiyouContainer" style="background:#fff;color:#000;padding:0;border-radius:8px"></div>
+  </section>
+
+</div>
+
+<!-- ===== Glossary Modal ===== -->
+<div id="glossaryModal" class="hide" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px)">
+  <div style="background:linear-gradient(135deg,#0a1226,#060b18);border:1px solid var(--card-border);border-radius:18px;max-width:920px;width:100%;max-height:88vh;overflow-y:auto;padding:0;box-shadow:0 30px 80px rgba(0,0,0,0.6)">
+    <div style="position:sticky;top:0;background:linear-gradient(135deg,rgba(14,165,233,0.18),rgba(139,92,246,0.18));backdrop-filter:blur(10px);padding:18px 24px;border-bottom:1px solid var(--card-border);display:flex;justify-content:space-between;align-items:center;border-radius:18px 18px 0 0">
+      <div>
+        <h2 style="font-size:18px;letter-spacing:.04em">📖 不動産投資 用語集</h2>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px">本アプリで使用する査定・収支・規制関連の主要用語</div>
+      </div>
+      <button class="btn btn-ghost" id="closeGlossary" style="padding:6px 14px">✕ 閉じる</button>
+    </div>
+    <div id="glossaryBody" style="padding:24px"></div>
+  </div>
+</div>
+
+<!-- ===== Offscreen PDF Report ===== -->
+<div id="reportRoot"></div>
+
+<script>
+/* =========================================================
+ *  収益物件 AI査定シミュレーター
+ *  Vanilla JS / Claude API / Chart.js / jsPDF
+ * ========================================================= */
+
+const STATE = {
+  apiKey: localStorage.getItem('claude_api_key') || '',
+  driveKey: localStorage.getItem('drive_api_key') || '',
+  step: 1,
+  basic: {},
+  rentRoll: [],
+  expenses: {},
+  market: null,    // Claude API結果
+  areaInfo: null,  // 住所ベースのエリア情報
+  result: null,    // 査定計算結果
+  files: { deed:[], map:[], rr:[], drive:[], exp:[], tax:[] },
+};
+
+/* ---------- Utility ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const fmtY = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
+const fmtN = n => (Math.round(Number(n)||0)).toLocaleString('ja-JP');
+const fmtP = (n,d=2) => (Number(n)||0).toFixed(d) + '%';
+const fmtMan = n => { const v = (Number(n)||0)/10000; return v >= 10000 ? (v/10000).toFixed(2)+'億円' : v.toFixed(0)+'万円'; };
+const parseMoney = s => Number(String(s||'').replace(/[^\d.-]/g,'')) || 0;
+
+function showToast(msg, type='info'){
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:24px;right:24px;padding:14px 20px;border-radius:12px;
+    background:${type==='error'?'rgba(239,68,68,0.95)':type==='success'?'rgba(16,185,129,0.95)':'rgba(14,165,233,0.95)'};
+    color:#fff;font-weight:600;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,0.4);font-size:13px;max-width:380px`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='.3s'},2700);
+  setTimeout(()=>el.remove(),3000);
+}
+
+/* ---------- API Key ---------- */
+function refreshApiStatus(){
+  const ok = !!STATE.apiKey && STATE.apiKey.startsWith('sk-ant');
+  const el = $('#apiStatus');
+  el.textContent = ok ? 'Claude: 設定済' : 'Claude: 未設定';
+  el.className = 'pill ' + (ok?'green':'red');
+
+  const dok = !!STATE.driveKey && STATE.driveKey.length > 10;
+  const del = $('#driveStatus');
+  del.textContent = dok ? 'Drive: 設定済' : 'Drive: 未設定';
+  del.className = 'pill ' + (dok?'green':'red');
+}
+$('#apiKey').value = STATE.apiKey;
+$('#driveKey').value = STATE.driveKey;
+$('#toggleKey').onclick = ()=>{
+  const isPwd = $('#apiKey').type === 'password';
+  $('#apiKey').type = isPwd ? 'text' : 'password';
+  $('#driveKey').type = isPwd ? 'text' : 'password';
+};
+$('#saveKey').onclick = ()=>{
+  STATE.apiKey = $('#apiKey').value.trim();
+  STATE.driveKey = $('#driveKey').value.trim();
+  localStorage.setItem('claude_api_key', STATE.apiKey);
+  localStorage.setItem('drive_api_key', STATE.driveKey);
+  refreshApiStatus();
+  showToast('APIキーを保存しました','success');
+};
+refreshApiStatus();
+
+/* ---------- Money input formatter ---------- */
+function bindMoneyInputs(root=document){
+  $$('input.money', root).forEach(inp=>{
+    if(inp._money) return;
+    inp._money = true;
+    inp.addEventListener('input',()=>{
+      const v = inp.value.replace(/[^\d]/g,'');
+      inp.value = v ? Number(v).toLocaleString('ja-JP') : '';
+    });
+  });
+}
+bindMoneyInputs();
+
+/* ---------- Step navigation ---------- */
+function goStep(n){
+  STATE.step = n;
+  $$('.step-panel').forEach(p=>p.classList.toggle('hide', String(p.dataset.panel)!==String(n)));
+  $$('.step').forEach(s=>{
+    const d = Number(s.dataset.step);
+    s.classList.toggle('active', d===n);
+    s.classList.toggle('done', d<n);
+  });
+  if(n===5){ collectAll(); recalc(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{
+  collectAll();
+  goStep(Number(b.dataset.go));
+}));
+$$('.step').forEach(s=>s.addEventListener('click',()=>{
+  collectAll();
+  goStep(Number(s.dataset.step));
+}));
+
+/* ---------- 土地テーブル（複数筆対応） ---------- */
+function landAddRow(d={}){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="land-chiban" value="${d.chiban||''}" placeholder="123-4"/></td>
+    <td><input type="text" class="land-chimoku" value="${d.chimoku||''}" placeholder="宅地"/></td>
+    <td class="right"><input type="number" class="land-area" value="${d.area||''}" step="0.01" placeholder="220.50"/></td>
+    <td><input type="text" class="land-note" value="${d.note||''}" placeholder=""/></td>
+    <td><button class="del-btn">削</button></td>`;
+  tr.querySelector('.del-btn').onclick = ()=>{ tr.remove(); recalcLand(); };
+  tr.querySelectorAll('input').forEach(i=>i.addEventListener('input', recalcLand));
+  $('#landBody').appendChild(tr);
+  recalcLand();
+}
+function recalcLand(){
+  let total = 0;
+  $$('#landBody tr').forEach(tr=>{
+    total += Number(tr.querySelector('.land-area').value)||0;
+  });
+  $('#landTotal').textContent = total.toFixed(2) + ' ㎡';
+  $('#landTsubo').textContent = (total*0.3025).toFixed(2) + ' 坪';
+}
+$('#addLand').onclick = ()=>landAddRow();
+landAddRow();
+
+/* ---------- 建物テーブル（複数棟対応） ---------- */
+function bldgAddRow(d={}){
+  const tr = document.createElement('tr');
+  const structs = ['RC','SRC','重量鉄骨','軽量鉄骨','木造'];
+  const opts = structs.map(s=>`<option value="${s}" ${s===(d.struct||'RC')?'selected':''}>${s}</option>`).join('');
+  tr.innerHTML = `
+    <td><input type="text" class="b-name" value="${d.name||''}" placeholder="本館"/></td>
+    <td><select class="b-struct" style="width:100%;padding:8px;background:transparent;color:var(--text);border:1px solid transparent;border-radius:8px;font-family:inherit;font-size:13px">${opts}</select></td>
+    <td class="right"><input type="number" class="b-year" value="${d.year||''}" placeholder="2005" min="1900" max="2100"/></td>
+    <td class="right"><input type="number" class="b-floor" value="${d.floor||''}" step="0.01" placeholder="350.50"/></td>
+    <td><input type="text" class="b-note" value="${d.note||''}" placeholder=""/></td>
+    <td><button class="del-btn">削</button></td>`;
+  tr.querySelector('.del-btn').onclick = ()=>{ tr.remove(); recalcBldg(); };
+  tr.querySelectorAll('input,select').forEach(i=>i.addEventListener('input', recalcBldg));
+  $('#bldgBody').appendChild(tr);
+  recalcBldg();
+}
+function recalcBldg(){
+  let floor=0, minYear=0, mainStruct='', mainFloor=0;
+  $$('#bldgBody tr').forEach(tr=>{
+    const f = Number(tr.querySelector('.b-floor').value)||0;
+    const y = Number(tr.querySelector('.b-year').value)||0;
+    const s = tr.querySelector('.b-struct').value;
+    floor += f;
+    if(y && (!minYear || y<minYear)) minYear = y;
+    if(f>mainFloor){ mainFloor=f; mainStruct=s; }
+  });
+  $('#bldgFloorTotal').textContent = floor.toFixed(2) + ' ㎡';
+  $('#bldgMainStruct').textContent = mainStruct || '-';
+  $('#bldgAge').textContent = minYear ? (new Date().getFullYear()-minYear)+' 年（'+minYear+'年築）' : '-';
+}
+$('#addBldg').onclick = ()=>bldgAddRow();
+bldgAddRow();
+
+/* ---------- Rent Roll ---------- */
+function rrAddRow(d={}){
+  // noteからURLを抽出して分離（URLはdata-urlへ、表示は文字情報のみ）
+  const fullNote = d.note || '';
+  const urlMatch = fullNote.match(/https?:\/\/[^\s)］、,]+/);
+  const url = d._url || (urlMatch ? urlMatch[0] : '');
+  const displayNote = fullNote.replace(/https?:\/\/[^\s)］、,]+/g, '').replace(/\s+/g, ' ').trim();
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="rr-no" value="${d.no||''}" placeholder="101"/></td>
+    <td><input type="text" class="rr-plan" value="${d.plan||''}" placeholder="1K"/></td>
+    <td class="right"><input type="number" class="rr-area" value="${d.area||''}" step="0.01" placeholder="25.00"/></td>
+    <td class="right"><input type="text" class="rr-rent money" value="${d.rent?Number(d.rent).toLocaleString('ja-JP'):''}" placeholder="55,000"/></td>
+    <td class="right"><input type="text" class="rr-mgmt money" value="${d.mgmt?Number(d.mgmt).toLocaleString('ja-JP'):''}" placeholder="3,000"/></td>
+    <td style="text-align:center"><input type="checkbox" class="rr-vac" ${d.vacancy?'checked':''} /></td>
+    <td>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input type="text" class="rr-note" value="${displayNote.replace(/"/g,'&quot;')}" placeholder="備考" style="flex:1" data-url="${url}"/>
+        <a class="rr-note-link" href="${url||'#'}" target="_blank" rel="noopener" title="${url||'参考URL未登録'}"
+           style="display:${url?'inline-flex':'none'};width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;background:rgba(14,165,233,0.15);color:var(--blue);text-decoration:none;font-size:14px;flex-shrink:0">🌐</a>
+      </div>
+    </td>
+    <td><button class="del-btn">削</button></td>`;
+  tr.querySelector('.del-btn').onclick = ()=>{ tr.remove(); recalcRR(); };
+  tr.querySelectorAll('input').forEach(i=>i.addEventListener('input', recalcRR));
+  // 備考にURLが貼られたら自動でアイコンに格納＋inputから除去（blur時 / ペースト時）
+  const noteInp = tr.querySelector('.rr-note');
+  noteInp.addEventListener('blur', ()=>extractUrlFromNote(tr));
+  noteInp.addEventListener('paste', ()=>setTimeout(()=>extractUrlFromNote(tr), 50));
+  $('#rrBody').appendChild(tr);
+  bindMoneyInputs(tr);
+  recalcRR();
+}
+
+/* 備考のinputに含まれるURLを抽出→data-url＋アイコンへ移動、表示は文字情報のみ */
+function extractUrlFromNote(tr){
+  const noteInp = tr.querySelector('.rr-note');
+  const link = tr.querySelector('.rr-note-link');
+  if(!noteInp || !link) return;
+  const m = (noteInp.value||'').match(/https?:\/\/[^\s)］、,]+/);
+  if(m){
+    const url = m[0];
+    noteInp.dataset.url = url;
+    noteInp.value = noteInp.value.replace(/https?:\/\/[^\s)］、,]+/g, '').replace(/\s+/g, ' ').trim();
+  }
+  const url = noteInp.dataset.url || '';
+  if(url){
+    link.href = url;
+    link.title = url;
+    link.style.display = 'inline-flex';
+  } else {
+    link.style.display = 'none';
+  }
+}
+$('#addRow').onclick = ()=>rrAddRow();
+
+function recalcRR(){
+  let full=0, cur=0, occ=0, total=0;
+  $$('#rrBody tr').forEach(tr=>{
+    const rent = parseMoney(tr.querySelector('.rr-rent').value);
+    const mgmt = parseMoney(tr.querySelector('.rr-mgmt').value);
+    const total1 = rent + mgmt;
+    const vac = tr.querySelector('.rr-vac').checked;
+    full += total1;
+    if(!vac){ cur += total1; occ++; }
+    total++;
+  });
+  $('#rrUnits').textContent = total + ' 戸';
+  $('#rrFullMonth').textContent = fmtY(full);
+  $('#rrFullYear').textContent = fmtY(full*12);
+  $('#rrCurMonth').textContent = fmtY(cur);
+  $('#rrOcc').textContent = occ + ' / ' + total;
+}
+// 初期5行
+for(let i=0;i<5;i++) rrAddRow({no:String(101+i), plan:'1K', area:25, rent:55000, mgmt:3000});
+
+/* ---------- Drag&Drop Upload ---------- */
+function setupDrop(dropId, inputId, kind){
+  const drop = $('#'+dropId), input = $('#'+inputId);
+  drop.onclick = ()=>input.click();
+  drop.ondragover = e=>{e.preventDefault();drop.classList.add('over')};
+  drop.ondragleave = ()=>drop.classList.remove('over');
+  drop.ondrop = e=>{
+    e.preventDefault();drop.classList.remove('over');
+    handleFiles(e.dataTransfer.files, kind);
+  };
+  input.onchange = ()=>handleFiles(input.files, kind);
+}
+setupDrop('dropDeed','fileDeed','deed');
+setupDrop('dropMap','fileMap','map');
+setupDrop('dropRR','fileRR','rr');
+setupDrop('dropExp','fileExp','exp');
+setupDrop('dropTax','fileTax','tax');
+
+function handleFiles(fileList, kind){
+  const arr = Array.from(fileList);
+  STATE.files[kind] = (STATE.files[kind]||[]).concat(arr);
+  const containerId = kind==='deed'?'#deedFiles':kind==='map'?'#mapFiles':kind==='rr'?'#rrFiles':kind==='exp'?'#expFiles':'#taxFiles';
+  const c = $(containerId);
+  arr.forEach(f=>{
+    const chip = document.createElement('span');
+    chip.className = 'file-chip';
+    chip.innerHTML = `📎 ${f.name} <span style="color:var(--sub)">(${(f.size/1024).toFixed(0)}KB)</span>`;
+    c.appendChild(chip);
+  });
+}
+
+/* ---------- Collect form data ---------- */
+function collectAll(){
+  // 土地（複数筆）
+  const lands = $$('#landBody tr').map(tr=>({
+    chiban: tr.querySelector('.land-chiban').value,
+    chimoku: tr.querySelector('.land-chimoku').value,
+    area: Number(tr.querySelector('.land-area').value)||0,
+    note: tr.querySelector('.land-note').value,
+  }));
+  // 建物（複数棟）
+  const buildings = $$('#bldgBody tr').map(tr=>({
+    name: tr.querySelector('.b-name').value,
+    struct: tr.querySelector('.b-struct').value,
+    year: Number(tr.querySelector('.b-year').value)||0,
+    floor: Number(tr.querySelector('.b-floor').value)||0,
+    note: tr.querySelector('.b-note').value,
+  }));
+  // 合計（戸数はレントロール行数から自動算出）
+  const totalLand  = lands.reduce((s,l)=>s+l.area, 0);
+  const totalFloor = buildings.reduce((s,b)=>s+b.floor, 0);
+  const totalUnits = $$('#rrBody tr').length;
+  // 代表構造（延床最大）
+  const mainBldg = buildings.reduce((m,b)=>(b.floor>(m?m.floor:0))?b:m, null);
+  // 最古築年
+  const oldestYear = buildings.reduce((m,b)=>(b.year && (!m || b.year<m))?b.year:m, 0);
+
+  STATE.basic = {
+    name: $('#propName').value,
+    zip: $('#propZip').value,
+    pref: $('#propPref').value,
+    city: $('#propCity').value,
+    addr: $('#propAddr').value,
+    lands, buildings,
+    land: totalLand,
+    floor: totalFloor,
+    units: totalUnits,
+    struct: mainBldg ? mainBldg.struct : '',
+    year: oldestYear,
+    age: oldestYear ? (new Date().getFullYear()-oldestYear) : 0,
+    // STEP2から
+    status: $('#propStatus') ? $('#propStatus').value : '満室',
+    park: Number($('#propPark') ? $('#propPark').value : 0) || 0,
+    parkFee: parseMoney($('#propParkFee') ? $('#propParkFee').value : 0),
+  };
+  STATE.rentRoll = $$('#rrBody tr').map(tr=>{
+    const noteInp = tr.querySelector('.rr-note');
+    const note = noteInp.value || '';
+    const url = noteInp.dataset.url || '';
+    // 復元用にURLを含めて保存（rrAddRow側で再分離される）
+    const savedNote = url ? (note ? `${note} ${url}` : url) : note;
+    return {
+      no: tr.querySelector('.rr-no').value,
+      plan: tr.querySelector('.rr-plan').value,
+      area: Number(tr.querySelector('.rr-area').value)||0,
+      rent: parseMoney(tr.querySelector('.rr-rent').value),
+      mgmt: parseMoney(tr.querySelector('.rr-mgmt').value),
+      vacancy: tr.querySelector('.rr-vac').checked,
+      note: savedNote,
+    };
+  });
+  STATE.expenses = {
+    mgmtRate: Number($('#opMgmt').value)||0,
+    repair: parseMoney($('#opRepair').value),
+    tax: parseMoney($('#opTax').value),
+    ins: parseMoney($('#opIns').value),
+    etc: parseMoney($('#opEtc').value),
+    vacancy: Number($('#opVacancy').value)||0,
+    capMid: Number($('#capMid').value)||0,
+    capMin: Number($('#capMin').value)||0,
+    capMax: Number($('#capMax').value)||0,
+    dcfRate: Number($('#dcfRate').value)||0,
+    rentDrop: Number($('#rentDrop').value)||0,
+    evalName: $('#evalName').value,
+  };
+}
+
+/* ---------- Calculation Engine ---------- */
+function calcAll(){
+  const b = STATE.basic, rr = STATE.rentRoll, e = STATE.expenses, m = STATE.market;
+
+  // GPI: 満室想定年間賃料
+  const monthlyFull = rr.reduce((s,r)=>s + r.rent + r.mgmt, 0);
+  const parkYear = (b.park||0) * (b.parkFee||0) * 12;
+  const GPI = monthlyFull * 12 + parkYear;
+
+  // 現況
+  const monthlyCur = rr.filter(r=>!r.vacancy).reduce((s,r)=>s + r.rent + r.mgmt, 0);
+  const curYear = monthlyCur * 12 + parkYear;
+
+  // 空室損失
+  const vacancyRate = (e.vacancy || (m?m.vacancy_rate_estimate:5)) / 100;
+  const vacancyLoss = GPI * vacancyRate;
+
+  // EGI
+  const EGI = GPI - vacancyLoss;
+
+  // OPEX
+  const mgmtFee = EGI * (e.mgmtRate/100);
+  const repairY = e.repair * 12;
+  const OPEX = mgmtFee + repairY + e.tax + e.ins + e.etc;
+
+  // NOI
+  const NOI = EGI - OPEX;
+
+  // Cap rates（marketがあれば優先）
+  const capMin = (m && m.cap_rate)? m.cap_rate.min : e.capMin;
+  const capMid = (m && m.cap_rate)? m.cap_rate.mid : e.capMid;
+  const capMax = (m && m.cap_rate)? m.cap_rate.max : e.capMax;
+
+  // 査定価格
+  const priceUp  = capMin>0 ? NOI / (capMin/100) : 0;
+  const priceMid = capMid>0 ? NOI / (capMid/100) : 0;
+  const priceLow = capMax>0 ? NOI / (capMax/100) : 0;
+
+  // 利回り
+  const grossYield = priceMid>0 ? (GPI / priceMid * 100) : 0;
+  const curYield   = priceMid>0 ? (curYear / priceMid * 100) : 0;
+  const noiYield   = priceMid>0 ? (NOI / priceMid * 100) : 0;
+  const paybackY   = NOI>0 ? (priceMid / NOI) : 0;
+
+  // Model B: 相場価格モデル
+  let modelB = null;
+  if(m && m.price_per_sqm && b.floor>0){
+    const lo = m.price_per_sqm.min * 10000 * b.floor;
+    const md = m.price_per_sqm.mid * 10000 * b.floor;
+    const hi = m.price_per_sqm.max * 10000 * b.floor;
+    modelB = { low:lo, mid:md, high:hi, sqmLow:m.price_per_sqm.min, sqmMid:m.price_per_sqm.mid, sqmHigh:m.price_per_sqm.max };
+  } else if(b.floor>0){
+    // fallback 標準値
+    const baseSqm = 25; // 万円/㎡ ダミー
+    const lo = baseSqm*0.7*10000*b.floor;
+    const md = baseSqm*10000*b.floor;
+    const hi = baseSqm*1.3*10000*b.floor;
+    modelB = { low:lo, mid:md, high:hi, sqmLow:baseSqm*0.7, sqmMid:baseSqm, sqmHigh:baseSqm*1.3, fallback:true };
+  }
+
+  // 将来予測（10年）
+  const future = [];
+  const drop = (e.rentDrop||0)/100;
+  for(let y=0;y<=10;y++){
+    const futGPI = GPI * Math.pow(1-drop, y);
+    const futNOI = futGPI*(1-vacancyRate) - OPEX;
+    const futCap = capMid + y*0.05; // 築年経過で利回り上昇仮定
+    const futPrice = futCap>0 ? futNOI/(futCap/100) : 0;
+    future.push({year:y, NOI:futNOI, cap:futCap, price:futPrice});
+  }
+
+  // DCF現在価値
+  let dcfNPV = 0;
+  const r = (e.dcfRate||6)/100;
+  for(let y=1;y<=10;y++){
+    dcfNPV += future[y].NOI / Math.pow(1+r, y);
+  }
+  dcfNPV += future[10].price / Math.pow(1+r, 10);
+
+  return {
+    GPI, vacancyLoss, EGI, mgmtFee, repairY, OPEX, NOI,
+    curYear, monthlyFull, monthlyCur,
+    capMin, capMid, capMax,
+    priceUp, priceMid, priceLow,
+    grossYield, curYield, noiYield, paybackY,
+    modelB, future, dcfNPV, vacancyRate
+  };
+}
+
+/* ---------- Render result ---------- */
+let chartFutureRef, chartCapRef, chartSqmRef;
+function renderResult(R){
+  $('#rsUp').textContent = fmtMan(R.priceUp);
+  $('#rsMid').textContent = fmtMan(R.priceMid);
+  $('#rsLow').textContent = fmtMan(R.priceLow);
+  $('#rsUpY').textContent  = `CAP ${R.capMin.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
+  $('#rsMidY').textContent = `CAP ${R.capMid.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
+  $('#rsLowY').textContent = `CAP ${R.capMax.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
+
+  $('#rsGY').textContent = fmtP(R.grossYield);
+  $('#rsCY').textContent = fmtP(R.curYield);
+  $('#rsNOIY').textContent = fmtP(R.noiYield);
+  $('#rsPB').textContent = R.paybackY>0 ? R.paybackY.toFixed(1)+' 年' : '-';
+
+  if(R.modelB){
+    $('#rsMbLow').textContent  = fmtMan(R.modelB.low);
+    $('#rsMbMid').textContent  = fmtMan(R.modelB.mid);
+    $('#rsMbHigh').textContent = fmtMan(R.modelB.high);
+    $('#rsMbLowU').textContent  = R.modelB.sqmLow.toFixed(1)+' 万円/㎡';
+    $('#rsMbMidU').textContent  = R.modelB.sqmMid.toFixed(1)+' 万円/㎡';
+    $('#rsMbHighU').textContent = R.modelB.sqmHigh.toFixed(1)+' 万円/㎡';
+  }
+
+  // 乖離分析
+  let cmp = '';
+  if(R.modelB && R.priceMid>0){
+    const diff = (R.modelB.mid - R.priceMid) / R.priceMid * 100;
+    const dir = diff>0 ? '相場価格モデルが高い' : '収益還元モデルが高い';
+    cmp = `収益還元法（中央値）：<b>${fmtMan(R.priceMid)}</b> / 相場価格モデル：<b>${fmtMan(R.modelB.mid)}</b><br>
+           乖離率：<b style="color:${Math.abs(diff)>20?'var(--red)':'var(--green)'}">${diff.toFixed(1)}%</b>（${dir}）<br>
+           ${R.modelB.fallback ? '<span style="color:var(--orange)">※AI相場調査未実施のため標準値で算出</span>' : ''}
+           ${Math.abs(diff)>20 ? '<br><span style="color:var(--orange)">⚠ 乖離が大きいため、レントロール根拠と相場根拠の両面から再検証推奨</span>' : ''}`;
+  } else cmp = '相場モデルデータがありません。STEP4でAI相場調査を実行してください。';
+  $('#rsCompare').innerHTML = cmp;
+
+  // PnL Table
+  const tbl = $('#pnlTable');
+  tbl.innerHTML = `
+    <thead><tr><th>項目</th><th style="text-align:right">年額</th></tr></thead>
+    <tbody>
+      <tr><td>満室想定賃料 (GPI)</td><td class="num">${fmtY(R.GPI)}</td></tr>
+      <tr><td>　空室損失（${(R.vacancyRate*100).toFixed(1)}%）</td><td class="num" style="color:var(--red)">▲${fmtY(R.vacancyLoss)}</td></tr>
+      <tr class="subtotal"><td>実効総収入 (EGI)</td><td class="num">${fmtY(R.EGI)}</td></tr>
+      <tr><td>　管理委託費</td><td class="num">${fmtY(R.mgmtFee)}</td></tr>
+      <tr><td>　修繕積立金</td><td class="num">${fmtY(R.repairY)}</td></tr>
+      <tr><td>　固定資産税</td><td class="num">${fmtY(STATE.expenses.tax)}</td></tr>
+      <tr><td>　保険料</td><td class="num">${fmtY(STATE.expenses.ins)}</td></tr>
+      <tr><td>　その他</td><td class="num">${fmtY(STATE.expenses.etc)}</td></tr>
+      <tr class="subtotal"><td>年間経費 (OPEX)</td><td class="num" style="color:var(--red)">▲${fmtY(R.OPEX)}</td></tr>
+      <tr class="total"><td>純営業収益 (NOI)</td><td class="num">${fmtY(R.NOI)}</td></tr>
+      <tr><td>DCF 10年現在価値</td><td class="num">${fmtMan(R.dcfNPV)}</td></tr>
+    </tbody>`;
+
+  // Charts
+  drawCharts(R);
+}
+
+function drawCharts(R){
+  if(chartFutureRef) chartFutureRef.destroy();
+  if(chartCapRef) chartCapRef.destroy();
+  if(chartSqmRef) chartSqmRef.destroy();
+
+  // 将来予測レポートテキスト生成
+  renderFutureReport(R);
+
+  const opts = {
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+    scales:{
+      x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }
+  };
+
+  chartFutureRef = new Chart($('#chartFuture'),{
+    type:'line',
+    data:{
+      labels:R.future.map(f=>f.year+'年後'),
+      datasets:[
+        {label:'NOI（万円）',data:R.future.map(f=>Math.round(f.NOI/10000)),borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.15)',tension:.3,yAxisID:'y'},
+        {label:'CAP RATE %',data:R.future.map(f=>f.cap.toFixed(2)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)',tension:.3,yAxisID:'y1'}
+      ]
+    },
+    options:{...opts,scales:{
+      x:opts.scales.x,
+      y:{position:'left',ticks:{color:'#10b981'},grid:{color:'rgba(255,255,255,0.05)'},title:{display:true,text:'NOI(万円)',color:'#10b981'}},
+      y1:{position:'right',ticks:{color:'#f59e0b'},grid:{display:false},title:{display:true,text:'CAP %',color:'#f59e0b'}}
+    }}
+  });
+
+  chartCapRef = new Chart($('#chartCap'),{
+    type:'bar',
+    data:{
+      labels:['下限（強気）','中央値（標準）','上限（保守）'],
+      datasets:[{label:'CAP RATE %',data:[R.capMin,R.capMid,R.capMax],backgroundColor:['rgba(16,185,129,0.6)','rgba(14,165,233,0.6)','rgba(245,158,11,0.6)'],borderColor:['#10b981','#0ea5e9','#f59e0b'],borderWidth:2}]
+    },options:opts
+  });
+
+  if(R.modelB){
+    chartSqmRef = new Chart($('#chartSqm'),{
+      type:'bar',
+      data:{
+        labels:['下限','中央値','上限'],
+        datasets:[{label:'㎡単価（万円）',data:[R.modelB.sqmLow,R.modelB.sqmMid,R.modelB.sqmHigh],backgroundColor:'rgba(14,165,233,0.6)',borderColor:'#0ea5e9',borderWidth:2}]
+      },options:opts
+    });
+  }
+}
+
+function renderFutureReport(R){
+  const f0 = R.future[0], f5 = R.future[5], f10 = R.future[10];
+  const noiDrop5 = f0.NOI>0 ? (1 - f5.NOI/f0.NOI)*100 : 0;
+  const noiDrop10 = f0.NOI>0 ? (1 - f10.NOI/f0.NOI)*100 : 0;
+  const priceDrop10 = f0.price>0 ? (1 - f10.price/f0.price)*100 : 0;
+  const totalNoi10 = R.future.slice(1,11).reduce((s,f)=>s+f.NOI, 0);
+  const dcfVsCurrent = R.priceMid>0 ? (R.dcfNPV/R.priceMid*100).toFixed(1) : 0;
+
+  $('#futureBasic').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px">
+      <div style="padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px">
+        <span style="color:var(--sub);font-size:10px">5年後 NOI</span>
+        <b style="float:right;font-family:Inter;color:var(--green)">${fmtMan(f5.NOI)}</b>
+        <span style="float:right;color:var(--red);font-size:10px;margin-right:6px">▲${noiDrop5.toFixed(1)}%</span>
+      </div>
+      <div style="padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px">
+        <span style="color:var(--sub);font-size:10px">10年後 NOI</span>
+        <b style="float:right;font-family:Inter;color:var(--green)">${fmtMan(f10.NOI)}</b>
+        <span style="float:right;color:var(--red);font-size:10px;margin-right:6px">▲${noiDrop10.toFixed(1)}%</span>
+      </div>
+      <div style="padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px">
+        <span style="color:var(--sub);font-size:10px">10年後 CAP</span>
+        <b style="float:right;font-family:Inter;color:var(--orange)">${f10.cap.toFixed(2)}%</b>
+      </div>
+      <div style="padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px">
+        <span style="color:var(--sub);font-size:10px">10年後 価格</span>
+        <b style="float:right;font-family:Inter">${fmtMan(f10.price)}</b>
+        <span style="float:right;color:var(--red);font-size:10px;margin-right:6px">▲${priceDrop10.toFixed(1)}%</span>
+      </div>
+    </div>
+    <div style="color:var(--text);margin-bottom:4px"><b style="color:var(--blue)">▼ 計算前提</b></div>
+    <ul style="margin:2px 0 8px;padding-left:18px;color:var(--sub)">
+      <li>年間賃料下落率：<b style="color:var(--text)">${STATE.expenses.rentDrop||0}%/年</b>（築年経過による賃料減退を反映）</li>
+      <li>キャップレート上昇：<b style="color:var(--text)">+0.05%/年</b>（築古化リスクプレミアム）</li>
+      <li>OPEX（経費）は当初値で一定</li>
+      <li>DCF割引率：<b style="color:var(--text)">${STATE.expenses.dcfRate||0}%</b></li>
+    </ul>
+    <div style="color:var(--text);margin-bottom:4px"><b style="color:var(--blue)">▼ 読み方</b></div>
+    <ul style="margin:2px 0 8px;padding-left:18px;color:var(--sub)">
+      <li><b style="color:var(--green)">緑線：NOI推移</b> — 賃料下落でNOIは10年で <b style="color:var(--red)">▲${noiDrop10.toFixed(1)}%</b> 減少見込み</li>
+      <li><b style="color:var(--orange)">橙線：CAP RATE推移</b> — 築年経過で <b>${R.capMid.toFixed(2)}% → ${f10.cap.toFixed(2)}%</b> に上昇</li>
+      <li>NOI下落 × CAP上昇 ⇒ 10年後の理論価格は <b>${fmtMan(f10.price)}</b>（中央値比 ▲${priceDrop10.toFixed(1)}%）</li>
+    </ul>
+    <div style="color:var(--text);margin-bottom:4px"><b style="color:var(--blue)">▼ 投資判断のポイント</b></div>
+    <ul style="margin:2px 0 8px;padding-left:18px;color:var(--sub)">
+      <li>10年間のNOI累計：<b style="color:var(--green)">${fmtMan(totalNoi10)}</b>（インカム総額）</li>
+      <li>DCF現在価値：<b style="color:var(--blue)">${fmtMan(R.dcfNPV)}</b>（現在の査定価格 ${fmtMan(R.priceMid)} の <b>${dcfVsCurrent}%</b>）</li>
+      <li>DCFが査定価格を <b>${dcfVsCurrent>=100?'<span style="color:var(--green)">上回る</span>':'<span style="color:var(--orange)">下回る</span>'}</b>場合、${dcfVsCurrent>=100?'投資リターンが期待値以上':'割引率に対しリターンが追いついていない'}</li>
+      ${R.paybackY>0 ? `<li>NOIベース回収年数：<b>${R.paybackY.toFixed(1)}年</b>${R.paybackY<15?'（良好）':R.paybackY<20?'（標準）':'（長期）'}</li>`:''}
+    </ul>
+    <div style="margin-top:6px;font-size:10px;color:var(--orange)">⚠ 本予測は機械的シミュレーション。実際の賃料・CAPは経済情勢・大規模修繕・空室変動で大きく振れます。</div>
+  `;
+}
+
+/* AI詳細解説（物件特化コメント） */
+$('#btnFutureAI').onclick = async ()=>{
+  if(!STATE.result || !STATE.basic.name){ showToast('STEP1-3を入力後、再度お試しください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const out = $('#futureAI');
+  out.innerHTML = '<div style="color:var(--blue);font-size:11px">🤖 AIが物件特化の将来予測解説を生成中…</div>';
+
+  try{
+    const R = STATE.result, b = STATE.basic;
+    const prompt = `あなたは日本の収益不動産投資の鑑定・分析エキスパートです。
+以下の物件の10年将来予測について、投資家向けに簡潔な所感をJSONで返してください。
+
+【物件】
+- 物件名: ${b.name}
+- 所在地: ${b.pref}${b.city}${b.addr}
+- 構造: ${b.struct} 築${b.age}年 ${b.units}戸 延床${b.floor}㎡
+
+【現状指標】
+- 査定価格（中央値）: ${fmtMan(R.priceMid)}
+- 満室想定利回り: ${R.grossYield.toFixed(2)}%
+- NOI利回り: ${R.noiYield.toFixed(2)}%
+- 投資回収年数: ${R.paybackY.toFixed(1)}年
+
+【10年後予測】
+- NOI: ${fmtMan(R.future[10].NOI)}（現状比 ${(R.future[10].NOI/R.future[0].NOI*100-100).toFixed(1)}%）
+- CAP RATE: ${R.future[10].cap.toFixed(2)}%
+- 理論価格: ${fmtMan(R.future[10].price)}
+- DCF現在価値: ${fmtMan(R.dcfNPV)}
+
+【出力フォーマット】
+JSONのみ、前置き不要：
+
+{
+  "strengths": ["この物件の将来性における強み1（80字以内）", "強み2", "強み3"],
+  "risks": ["将来リスク1（80字以内）", "リスク2", "リスク3"],
+  "exit_strategy": "10年後の出口戦略提案（200字以内、売却 or 保有継続 or 大規模修繕タイミング等）",
+  "verdict": "投資判断（買い推奨/慎重/見送り のいずれか + 50字理由）"
+}`;
+    const text = await callClaude([{role:'user',content:prompt}], '', 2000);
+    const d = extractJson(text);
+    STATE.futureAI = d;
+
+    out.innerHTML = `
+      <div style="padding:10px;border-radius:8px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.3);margin-top:8px">
+        <div style="font-size:11px;color:var(--purple);font-weight:700;margin-bottom:6px">🤖 AI詳細所感</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:10px;color:var(--green);font-weight:700;margin-bottom:2px">▲ 将来の強み</div>
+            <ul style="margin:0;padding-left:16px;font-size:10px;line-height:1.6">${(d.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--red);font-weight:700;margin-bottom:2px">▼ 将来リスク</div>
+            <ul style="margin:0;padding-left:16px;font-size:10px;line-height:1.6">${(d.risks||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
+          </div>
+        </div>
+        <div style="padding:6px 8px;background:rgba(14,165,233,0.10);border-left:3px solid var(--blue);font-size:11px;line-height:1.6;margin-bottom:6px">
+          <b style="color:var(--blue)">出口戦略：</b>${d.exit_strategy||''}
+        </div>
+        <div style="padding:8px 10px;background:rgba(245,158,11,0.10);border-radius:6px;font-size:12px;font-weight:700">
+          🎯 ${d.verdict||''}
+        </div>
+      </div>`;
+    showToast('AI解説を生成しました','success');
+  }catch(err){
+    out.innerHTML = `<div style="color:var(--red);font-size:11px">❌ ${err.message}</div>`;
+  }
+};
+
+function recalc(){
+  collectAll();
+  STATE.result = calcAll();
+  renderResult(STATE.result);
+}
+$('#btnRecalc').onclick = recalc;
+
+/* =========================================================
+ *  Claude API Integration
+ * ========================================================= */
+async function callClaude(messages, system='', maxTokens=2000, temperature=undefined){
+  if(!STATE.apiKey || !STATE.apiKey.startsWith('sk-ant')){
+    throw new Error('APIキーが未設定です。画面上部から登録してください。');
+  }
+  const body = {
+    model:'claude-opus-4-7',
+    max_tokens:maxTokens,
+    messages
+  };
+  if(system) body.system = system;
+  // claude-opus-4-7 では temperature は deprecated のため送らない（引数は無視）
+
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key':STATE.apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error('Claude API: '+res.status+' '+t.slice(0,200));
+  }
+  const j = await res.json();
+  return j.content?.map(c=>c.text||'').join('') || '';
+}
+
+/* Web検索ツール対応版：text + 引用URL一覧を返す */
+async function callClaudeWithSearch(messages, system='', maxTokens=4000, maxSearches=5){
+  if(!STATE.apiKey || !STATE.apiKey.startsWith('sk-ant')){
+    throw new Error('APIキーが未設定です。');
+  }
+  const body = {
+    model:'claude-opus-4-7',
+    max_tokens:maxTokens,
+    messages,
+    tools:[{
+      type:'web_search_20250305',
+      name:'web_search',
+      max_uses:maxSearches
+    }]
+  };
+  if(system) body.system = system;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key':STATE.apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error('Claude API: '+res.status+' '+t.slice(0,300));
+  }
+  const j = await res.json();
+  let text = '';
+  const citations = [];
+  const seen = new Set();
+  for(const c of j.content || []){
+    if(c.type === 'text'){
+      text += c.text || '';
+      if(Array.isArray(c.citations)){
+        for(const cit of c.citations){
+          const url = cit.url || cit.source || '';
+          if(url && !seen.has(url)){
+            seen.add(url);
+            citations.push({ url, title: cit.title || cit.cited_text?.slice(0,80) || url });
+          }
+        }
+      }
+    } else if(c.type === 'web_search_tool_result'){
+      // 検索結果にもURLが入ることがある
+      const items = c.content || [];
+      for(const it of items){
+        const url = it.url;
+        if(url && !seen.has(url)){
+          seen.add(url);
+          citations.push({ url, title: it.title || url });
+        }
+      }
+    }
+  }
+  return { text, citations };
+}
+
+function extractJson(s){
+  // ```json ... ``` を剥がす
+  const m = s.match(/```json\s*([\s\S]*?)```/) || s.match(/```\s*([\s\S]*?)```/);
+  let text = m ? m[1] : s;
+  text = text.trim();
+
+  // 配列 [...] と オブジェクト {...} の両方に対応
+  const aB = text.indexOf('['), aBr = text.lastIndexOf(']');
+  const oB = text.indexOf('{'), oBr = text.lastIndexOf('}');
+
+  // 配列が先に来るなら配列を、それ以外はオブジェクトを抽出
+  if(aB >= 0 && (oB < 0 || aB < oB) && aBr > aB){
+    text = text.slice(aB, aBr+1);
+  } else if(oB >= 0 && oBr > oB){
+    text = text.slice(oB, oBr+1);
+  }
+
+  try{ return JSON.parse(text); }
+  catch(e){
+    // 1段階目で失敗した場合、行間カンマ欠落の修復を試みる
+    try{
+      const fixed = text.replace(/\}\s*\n\s*\{/g, '},{').replace(/\]\s*\n\s*\[/g, '],[');
+      return JSON.parse(fixed);
+    }catch(e2){
+      throw new Error('JSON解析失敗: '+e.message+'\n受信内容: '+s.slice(0,300));
+    }
+  }
+}
+
+/* ---------- Area Info (住所→公的規制等) ---------- */
+$('#btnAreaInfo').onclick = async ()=>{
+  collectAll();
+  const b = STATE.basic;
+  const addr = `${b.pref||''}${b.city||''}${b.addr||''}`.trim();
+  if(!addr){ showToast('STEP1で所在地を入力してください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const out = $('#areaInfoResult');
+  out.innerHTML = '<div style="color:var(--blue);font-size:12px">📡 AIがエリア情報を調査中…（用途地域・道路・ライフライン・規制）</div>';
+
+  try{
+    const prompt = `あなたは日本の不動産・都市計画のエキスパートです。
+以下の住所について、公開情報をもとにエリア情報を推定/調査して回答してください。
+不確実な項目は「要確認」と明記し、推定値の場合は「推定」と付記してください。
+
+【住所】${addr}
+
+【回答フォーマット】
+必ず以下のJSONのみで回答してください。前置き・解説・コードブロック装飾は一切不要。
+
+{
+  "youto_chiiki": "用途地域（例: 第一種住居地域）",
+  "kenpei": "建ぺい率%（例: 60%）",
+  "yoseki": "容積率%（例: 200%）",
+  "boukaku": "防火地域区分（例: 準防火地域 / 指定なし）",
+  "koudo": "高度地区（例: 第2種高度地区 / 指定なし）",
+  "toshi_keikaku": "都市計画区分（市街化区域/市街化調整区域/非線引き等）",
+  "douro": "接道状況（接道種別・幅員 例: 市道4m / セットバック要否）",
+  "lifeline": {
+    "denki": "電気（事業者）",
+    "gas": "ガス（都市ガス/プロパン）",
+    "suidou": "上水道",
+    "gesui": "下水道（公共下水/合併浄化槽）"
+  },
+  "dosjou_osen": "土壌汚染リスク（土壌汚染対策法 要措置区域該否・推定）",
+  "suishitsu": "水質汚染リスク（推定）",
+  "kisei": ["地域固有の規制・条例（例: 景観条例、屋外広告物条例等）"],
+  "saigai_risk": ["災害リスク（洪水/土砂/津波/液状化等、ハザードマップ推定）"],
+  "transit": "最寄駅・徒歩分（推定）",
+  "shisetsu": "周辺施設（学校/病院/スーパー等の充実度コメント）",
+  "souhyou": "総評コメント（200字以内）"
+}`;
+
+    const text = await callClaude([{role:'user',content:prompt}], '', 3000);
+    const data = extractJson(text);
+    STATE.areaInfo = data;
+
+    out.innerHTML = `
+      <div class="grid grid-3" style="margin-top:8px">
+        <div class="k blue" style="padding:10px;border-radius:10px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">用途地域</div>
+          <div style="font-weight:700;font-size:14px;margin-top:2px">${data.youto_chiiki||'—'}</div>
+        </div>
+        <div class="k green" style="padding:10px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">建ぺい/容積</div>
+          <div style="font-weight:700;font-size:14px;margin-top:2px">${data.kenpei||'—'} / ${data.yoseki||'—'}</div>
+        </div>
+        <div class="k orange" style="padding:10px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">都市計画区分</div>
+          <div style="font-weight:700;font-size:14px;margin-top:2px">${data.toshi_keikaku||'—'}</div>
+        </div>
+      </div>
+      <div class="grid grid-3" style="margin-top:8px">
+        <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">防火地域</div>
+          <div style="font-size:13px;margin-top:2px">${data.boukaku||'—'}</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">高度地区</div>
+          <div style="font-size:13px;margin-top:2px">${data.koudo||'—'}</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">接道状況</div>
+          <div style="font-size:13px;margin-top:2px">${data.douro||'—'}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+        <div style="font-size:10px;color:var(--sub);letter-spacing:.15em;margin-bottom:4px">ライフライン</div>
+        <div style="font-size:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          <div><b style="color:var(--blue)">電気:</b> ${data.lifeline?.denki||'—'}</div>
+          <div><b style="color:var(--blue)">ガス:</b> ${data.lifeline?.gas||'—'}</div>
+          <div><b style="color:var(--blue)">上水:</b> ${data.lifeline?.suidou||'—'}</div>
+          <div><b style="color:var(--blue)">下水:</b> ${data.lifeline?.gesui||'—'}</div>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:8px">
+        <div style="padding:10px;border-radius:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25)">
+          <div style="font-size:10px;color:var(--red);letter-spacing:.15em;margin-bottom:4px">⚠ 土壌・水質汚染</div>
+          <div style="font-size:12px">${data.dosjou_osen||'—'}<br>${data.suishitsu||''}</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25)">
+          <div style="font-size:10px;color:var(--orange);letter-spacing:.15em;margin-bottom:4px">⚠ 災害リスク</div>
+          <div style="font-size:12px">${(data.saigai_risk||[]).map(r=>`・${r}`).join('<br>')||'—'}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;border-radius:10px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.25)">
+        <div style="font-size:10px;color:var(--purple);letter-spacing:.15em;margin-bottom:4px">📋 地域条例・規制</div>
+        <div style="font-size:12px">${(data.kisei||[]).map(r=>`・${r}`).join('<br>')||'—'}</div>
+      </div>
+      <div class="grid grid-2" style="margin-top:8px">
+        <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">最寄駅・交通</div>
+          <div style="font-size:12px;margin-top:2px">${data.transit||'—'}</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+          <div style="font-size:10px;color:var(--sub);letter-spacing:.15em">周辺施設</div>
+          <div style="font-size:12px;margin-top:2px">${data.shisetsu||'—'}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:12px;border-radius:10px;background:rgba(14,165,233,0.08);border-left:3px solid var(--blue)">
+        <div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:4px">💡 総評</div>
+        <div style="font-size:12px;line-height:1.7">${data.souhyou||'—'}</div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--orange)">※ AI推定値です。融資・契約前には自治体窓口・登記簿等で必ず確認してください。</div>
+    `;
+    showToast('エリア情報を取得しました','success');
+  }catch(err){
+    out.innerHTML = `<div style="color:var(--red);font-size:12px">❌ ${err.message}</div>`;
+    showToast('エリア情報取得失敗: '+err.message,'error');
+  }
+};
+
+/* ---------- Market Research ---------- */
+$('#btnFetchMarket').onclick = async ()=>{
+  collectAll();
+  if(!STATE.basic.pref || !STATE.basic.city){
+    showToast('STEP1で所在地（都道府県・市区町村）を入力してください','error');return;
+  }
+  $('#aiLoad').classList.remove('hide');
+  $('#aiResult').classList.add('hide');
+  $('#aiMsg').textContent = 'Claude APIに問い合わせ中…';
+
+  try{
+    const prompt = `あなたは日本の収益不動産投資のエキスパートです。
+以下の物件について、周辺類似物件の相場帯（収益還元利回り・㎡単価）を推定してください。
+ネット上の中古一棟マンション・アパート相場感、エリアトレンド、人口動態、賃貸需要をふまえて回答すること。
+
+【物件情報】
+- 所在地：${STATE.basic.pref} ${STATE.basic.city} ${STATE.basic.addr}
+- 構造：${STATE.basic.struct}
+- 築年：${STATE.basic.year}年（築${new Date().getFullYear()-STATE.basic.year}年）
+- 総戸数：${STATE.basic.units}戸
+- 延床面積：${STATE.basic.floor}㎡
+- 土地面積：${STATE.basic.land}㎡
+- 現況：${STATE.basic.status}
+
+【回答フォーマット】
+必ず以下のJSONのみで回答してください。前置き・解説・コードブロック装飾は一切不要です。
+
+{
+  "cap_rate": { "min": 数値, "mid": 数値, "max": 数値 },
+  "vacancy_rate_estimate": 数値,
+  "price_per_sqm": { "min": 数値, "mid": 数値, "max": 数値 },
+  "area_trend": "エリア動向コメント100字以内",
+  "market_comment": "利回り設定根拠150字以内",
+  "risk_factors": ["リスク1", "リスク2", "リスク3"],
+  "strength_factors": ["強み1", "強み2", "強み3"]
+}
+
+数値はパーセンテージは数値のみ（例: 7.5）、㎡単価は万円単位の数値（例: 25.3）。`;
+
+    const text = await callClaude([{role:'user',content:prompt}], '', 2500);
+    const data = extractJson(text);
+    STATE.market = data;
+
+    // 表示
+    $('#mkCapMid').textContent = data.cap_rate.mid.toFixed(2)+'%';
+    $('#mkCapRng').textContent = data.cap_rate.min.toFixed(2)+'% 〜 '+data.cap_rate.max.toFixed(2)+'%';
+    $('#mkVac').textContent = data.vacancy_rate_estimate.toFixed(1)+'%';
+    $('#mkSqm').textContent = data.price_per_sqm.mid.toFixed(1)+' 万円/㎡';
+    $('#mkTrend').textContent = data.area_trend;
+    $('#mkComment').textContent = data.market_comment;
+    $('#mkStrength').innerHTML = (data.strength_factors||[]).map(s=>`<span class="tag strength">${s}</span>`).join('');
+    $('#mkRisk').innerHTML = (data.risk_factors||[]).map(s=>`<span class="tag risk">${s}</span>`).join('');
+
+    // 経費フォームのCAPも更新
+    $('#capMin').value = data.cap_rate.min.toFixed(2);
+    $('#capMid').value = data.cap_rate.mid.toFixed(2);
+    $('#capMax').value = data.cap_rate.max.toFixed(2);
+    $('#opVacancy').value = data.vacancy_rate_estimate.toFixed(1);
+
+    $('#aiLoad').classList.add('hide');
+    $('#aiResult').classList.remove('hide');
+    showToast('AI相場調査が完了しました','success');
+  }catch(err){
+    $('#aiLoad').classList.add('hide');
+    showToast('AI相場調査失敗: '+err.message,'error');
+  }
+};
+
+/* =========================================================
+ *  STEP3 経費 OCR（管理会社 月次/年間収支報告書）
+ * ========================================================= */
+$('#btnOcrExp').onclick = async ()=>{
+  const files = STATE.files.exp || [];
+  if(!files.length){ showToast('管理会社収支報告書をアップロードしてください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const out = $('#expResult');
+  out.innerHTML = '<div style="margin-top:10px;color:var(--blue);font-size:12px">🤖 AIが収支報告書を解析中…（PDF→高解像度画像化）</div>';
+
+  try{
+    const prompt = `あなたは日本の不動産管理会社が発行する収支報告書（月次/年間）の解析エキスパートです。
+添付ファイルから、賃貸経営の年間経費を以下のJSON形式で抽出してください。
+
+【判定ルール】
+- 「月次収支報告書」なら数値は1ヶ月分 → 12倍して年額換算
+- 「年間収支報告書」なら数値はそのまま年額として扱う
+- 月/年の判定はファイル内のタイトル・期間表示・「合計」欄から判断
+
+【抽出対象】
+1. 管理手数料 / 管理委託費（年額）
+2. 修繕費・修繕積立金・定額リフォーム費用（年額、月割で月額にも変換）
+3. 火災保険料・地震保険料（年額）
+4. 消防設備点検・建物管理費・清掃費等（その他経費に合算）
+5. 鍵交換・入退去関連費用・更新手数料・振込手数料（その他経費に合算）
+6. 収入合計（年額）—管理手数料率の算出に使用
+7. 共益費は **入居者から徴収するもの**（収入と同額の支出計上）なので **管理委託費に含めない**
+
+【出力フォーマット】
+JSONのみ、前置き・解説・コードブロック装飾なし。
+不明な項目は 0 を返す。数値はカンマ・¥・円を除去した整数。
+
+{
+  "is_yearly": true,
+  "income_total_yearly": 年間収入合計（円）,
+  "mgmt_fee_yearly": 管理手数料年額（円）,
+  "mgmt_rate_pct": 管理委託費率（% 小数1桁、収入比）,
+  "repair_yearly": 修繕費・リフォーム費年額（円）,
+  "repair_monthly": 修繕積立金月額（円）,
+  "insurance_yearly": 火災・地震保険料年額（円、不明なら0）,
+  "etc_yearly": その他経費年額（円）,
+  "breakdown": [
+    {"name": "管理手数料", "yearly": 数値},
+    {"name": "アパート経営支援サービス料", "yearly": 数値},
+    {"name": "消防設備点検費用", "yearly": 数値},
+    {"name": "定額リフォーム費用", "yearly": 数値},
+    {"name": "更新手数料", "yearly": 数値},
+    {"name": "振込手数料", "yearly": 数値}
+  ],
+  "period": "2024年01月〜2024年12月（年間）"
+}`;
+
+    const content = await buildVisionContent(files, prompt);
+    const text = await callClaude([{role:'user',content}], '', 4000);
+    const data = extractJson(text);
+
+    // 経費フォームに反映
+    if(data.mgmt_rate_pct > 0){
+      $('#opMgmt').value = data.mgmt_rate_pct.toFixed(1);
+    } else if(data.mgmt_fee_yearly > 0 && data.income_total_yearly > 0){
+      const rate = (data.mgmt_fee_yearly / data.income_total_yearly * 100).toFixed(1);
+      $('#opMgmt').value = rate;
+    }
+    if(data.repair_monthly > 0){
+      $('#opRepair').value = Number(data.repair_monthly).toLocaleString('ja-JP');
+    } else if(data.repair_yearly > 0){
+      $('#opRepair').value = Math.round(data.repair_yearly/12).toLocaleString('ja-JP');
+    }
+    if(data.insurance_yearly > 0){
+      $('#opIns').value = Number(data.insurance_yearly).toLocaleString('ja-JP');
+    }
+    if(data.etc_yearly > 0){
+      $('#opEtc').value = Number(data.etc_yearly).toLocaleString('ja-JP');
+    }
+
+    // 内訳表示
+    const rows = (data.breakdown||[]).map(b=>`<tr><td>${b.name}</td><td style="text-align:right;font-family:Inter">${Number(b.yearly||0).toLocaleString('ja-JP')}</td></tr>`).join('');
+    out.innerHTML = `
+      <div style="margin-top:10px;padding:12px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3)">
+        <div style="font-size:13px;color:var(--green);font-weight:700">✅ 経費抽出完了 — ${data.period||''}</div>
+        <div style="margin-top:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+          <div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px">
+            <div style="color:var(--sub);font-size:10px">管理委託費率</div>
+            <div style="font-weight:700;color:var(--blue)">${$('#opMgmt').value}%</div>
+          </div>
+          <div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px">
+            <div style="color:var(--sub);font-size:10px">修繕積立金</div>
+            <div style="font-weight:700;color:var(--green)">¥${$('#opRepair').value || 0}/月</div>
+          </div>
+          <div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px">
+            <div style="color:var(--sub);font-size:10px">その他経費</div>
+            <div style="font-weight:700;color:var(--orange)">¥${$('#opEtc').value || 0}/年</div>
+          </div>
+        </div>
+        ${rows ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--sub);cursor:pointer">📋 内訳（年額）</summary><table style="width:100%;font-size:11px;margin-top:6px;border-collapse:collapse">${rows}</table></details>` : ''}
+        <div style="margin-top:8px;font-size:10px;color:var(--orange)">⚠ 抽出値は必ず原本と照合してください。保険料は報告書に含まれない場合があります。</div>
+      </div>`;
+    showToast('経費を自動抽出しました','success');
+  }catch(err){
+    out.innerHTML = `<div style="margin-top:10px;padding:10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);font-size:12px;color:var(--red)">❌ ${err.message}</div>`;
+    showToast('経費抽出失敗: '+err.message,'error');
+  }
+};
+
+/* =========================================================
+ *  STEP3 固定資産税 OCR（自治体納税通知書）
+ * ========================================================= */
+$('#btnOcrTax').onclick = async ()=>{
+  const files = STATE.files.tax || [];
+  if(!files.length){ showToast('固定資産税納税通知書をアップロードしてください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const out = $('#taxResult');
+  out.innerHTML = '<div style="margin-top:10px;color:var(--purple);font-size:11px">🤖 AIが納税通知書を解析中…</div>';
+
+  try{
+    const prompt = `あなたは日本の自治体が発行する固定資産税納税通知書の解析エキスパートです。
+添付ファイルから対象物件の年間税額を抽出してください。
+
+【抽出対象】
+1. 固定資産税（年税額）— 土地・家屋それぞれと合計
+2. 都市計画税（年税額）— 土地・家屋それぞれと合計
+3. 課税標準額（土地・家屋）
+4. 評価額（土地・家屋、記載があれば）
+5. 納期別税額（1期/2期/3期/4期、合計と一致確認用）
+
+【ルール】
+- 複数物件が記載されている場合は **すべて合算** して返す
+- 月割せず、年税額のまま返す
+- 不明項目は 0
+- 数値はカンマ・¥・円除去した整数
+
+【出力フォーマット】
+JSONのみ、前置き・解説・コードブロック装飾なし。
+
+{
+  "year": "課税年度（例: 2025）",
+  "tax_total_yearly": 固定資産税+都市計画税 合計年額,
+  "kotei_yearly": 固定資産税 年額,
+  "toshi_yearly": 都市計画税 年額,
+  "kotei_land": 固定資産税 土地分,
+  "kotei_bldg": 固定資産税 家屋分,
+  "toshi_land": 都市計画税 土地分,
+  "toshi_bldg": 都市計画税 家屋分,
+  "kazei_land": 課税標準額 土地,
+  "kazei_bldg": 課税標準額 家屋,
+  "hyouka_land": 評価額 土地,
+  "hyouka_bldg": 評価額 家屋,
+  "municipality": "課税自治体名（例: 東京都目黒区）",
+  "properties_count": 物件数
+}`;
+
+    const content = await buildVisionContent(files, prompt);
+    const text = await callClaude([{role:'user',content}], '', 3000);
+    const data = extractJson(text);
+
+    // opTaxに反映（固定資産税+都市計画税 合計年額）
+    const total = data.tax_total_yearly || (data.kotei_yearly + data.toshi_yearly) || 0;
+    if(total > 0){
+      $('#opTax').value = Number(total).toLocaleString('ja-JP');
+    }
+
+    // 結果表示
+    out.innerHTML = `
+      <div style="margin-top:10px;padding:10px;border-radius:8px;background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.35)">
+        <div style="font-size:12px;color:var(--purple);font-weight:700">✅ 税額抽出完了 ${data.year?`(${data.year}年度)`:''} ${data.municipality?`／${data.municipality}`:''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:11px">
+          <div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px">
+            <div style="color:var(--sub);font-size:10px">固定資産税</div>
+            <div style="font-weight:700">¥${Number(data.kotei_yearly||0).toLocaleString('ja-JP')}</div>
+          </div>
+          <div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px">
+            <div style="color:var(--sub);font-size:10px">都市計画税</div>
+            <div style="font-weight:700">¥${Number(data.toshi_yearly||0).toLocaleString('ja-JP')}</div>
+          </div>
+          <div style="padding:6px;background:rgba(14,165,233,0.10);border-radius:6px;grid-column:span 2">
+            <div style="color:var(--sub);font-size:10px">合計年税額（→ 固定資産税フォームに反映）</div>
+            <div style="font-weight:800;color:var(--blue);font-size:14px">¥${Number(total).toLocaleString('ja-JP')}/年</div>
+          </div>
+        </div>
+        ${data.kazei_land||data.kazei_bldg ? `
+        <details style="margin-top:6px">
+          <summary style="font-size:10px;color:var(--sub);cursor:pointer">📋 課税明細</summary>
+          <table style="width:100%;font-size:11px;margin-top:4px;border-collapse:collapse">
+            <tr><td>課税標準 土地</td><td style="text-align:right;font-family:Inter">¥${Number(data.kazei_land||0).toLocaleString('ja-JP')}</td></tr>
+            <tr><td>課税標準 家屋</td><td style="text-align:right;font-family:Inter">¥${Number(data.kazei_bldg||0).toLocaleString('ja-JP')}</td></tr>
+            ${data.hyouka_land ? `<tr><td>評価額 土地</td><td style="text-align:right;font-family:Inter">¥${Number(data.hyouka_land).toLocaleString('ja-JP')}</td></tr>`:''}
+            ${data.hyouka_bldg ? `<tr><td>評価額 家屋</td><td style="text-align:right;font-family:Inter">¥${Number(data.hyouka_bldg).toLocaleString('ja-JP')}</td></tr>`:''}
+          </table>
+        </details>` : ''}
+        ${data.properties_count > 1 ? `<div style="margin-top:4px;font-size:10px;color:var(--orange)">⚠ ${data.properties_count}物件合算</div>` : ''}
+      </div>`;
+
+    // STATE保存（PDFレポートでも使用可能）
+    STATE.taxInfo = data;
+    showToast('税額を自動抽出しました','success');
+  }catch(err){
+    out.innerHTML = `<div style="margin-top:10px;padding:8px;border-radius:6px;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.3);font-size:11px;color:var(--red)">❌ ${err.message}</div>`;
+    showToast('税額抽出失敗: '+err.message,'error');
+  }
+};
+
+/* =========================================================
+ *  Google Drive Folder Import
+ * ========================================================= */
+function parseDriveFolderId(url){
+  if(!url) return null;
+  // 形式: https://drive.google.com/drive/folders/XXXXX?usp=...
+  let m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if(m) return m[1];
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m) return m[1];
+  // ID単体貼り付けにも対応
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(url.trim())) return url.trim();
+  return null;
+}
+
+async function driveListFolder(folderId){
+  if(!STATE.driveKey) throw new Error('Google Drive APIキーが未設定です。画面右上から登録してください。');
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size)&pageSize=200&key=${STATE.driveKey}`;
+  const res = await fetch(url);
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`Drive API ${res.status}: ${t.slice(0,200)}`);
+  }
+  const j = await res.json();
+  return j.files || [];
+}
+
+async function driveDownloadFile(file){
+  // Google Docs/Sheets等のWeb文書はexportが必要、通常ファイルはalt=media
+  const isGoogleDoc = file.mimeType.startsWith('application/vnd.google-apps.');
+  let url;
+  if(isGoogleDoc){
+    if(file.mimeType === 'application/vnd.google-apps.spreadsheet'){
+      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/csv&key=${STATE.driveKey}`;
+    } else if(file.mimeType === 'application/vnd.google-apps.document'){
+      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=application/pdf&key=${STATE.driveKey}`;
+    } else return null;
+  } else {
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${STATE.driveKey}`;
+  }
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`ダウンロード失敗 ${file.name}: ${res.status}`);
+  const blob = await res.blob();
+  // mimeを補正
+  let finalName = file.name;
+  let finalType = blob.type || file.mimeType;
+  if(isGoogleDoc && file.mimeType === 'application/vnd.google-apps.spreadsheet'){
+    finalName = file.name + '.csv';
+    finalType = 'text/csv';
+  } else if(isGoogleDoc && file.mimeType === 'application/vnd.google-apps.document'){
+    finalName = file.name + '.pdf';
+    finalType = 'application/pdf';
+  }
+  return new File([blob], finalName, { type: finalType });
+}
+
+function categorizeDriveFile(file){
+  const name = (file.name || '').toLowerCase();
+  const ext = (name.match(/\.([a-z0-9]+)$/)?.[1]) || '';
+
+  // ★最優先：査定不要キーワード（契約書/重説/過去査定/シミュ/ローン残高/概要書）
+  if(/重要事項|重説|媒介契約|売買契約|契約書|電子押印|電子契約|査定書|査定_|シミュレーション|シミュ|ローン残高|残債|残高証明|物件概要書|概要書|saiteisho|simulation/.test(name)){
+    return 'skip';
+  }
+
+  // ★画像ファイル：地図・図面・公図・マイソク等の明示キーワードのみ物件資料、それ以外は不要
+  if(['jpg','jpeg','png','gif','webp','heic','heif'].includes(ext)){
+    if(/地図|map|公図|マイソク|maisoku|図面|間取|平面図|配置図|案内図/.test(name)){
+      return 'map';
+    }
+    // それ以外の画像（外観写真・室内写真・連番ファイル名等）は不要
+    return 'skip';
+  }
+
+  // 固定資産税系（公課証明・評価証明・台帳記載も含む）
+  if(/固定資産税|納税通知|都市計画税|tax.notice|property.tax|資産税|公課証明|評価証明|台帳記載/.test(name)){
+    return 'tax';
+  }
+
+  // 収支系
+  if(/収支報告|年間収支|月次収支|経費明細|管理報告|expense|monthly.report|annual.report/.test(name)){
+    return 'exp';
+  }
+
+  // レントロール系
+  if(/レントロール|rentroll|rent.roll|rent-roll|賃料一覧|入居/.test(name) ||
+     /\.(xlsx|xls|csv)$/i.test(name)){
+    return 'rr';
+  }
+
+  // 謄本系
+  if(/謄本|登記|公図|地積|測量|全部事項|登記事項/.test(name)) return 'deed';
+
+  return 'map';
+}
+
+const DRIVE_CATEGORIES = [
+  {key:'deed', label:'📄 謄本・公図',   color:'#3b82f6'},
+  {key:'map',  label:'🗺️ 物件資料',     color:'#10b981'},
+  {key:'rr',   label:'📊 レントロール', color:'#f59e0b'},
+  {key:'exp',  label:'📑 収支報告書',   color:'#f97316'},
+  {key:'tax',  label:'🏛 固定資産税',    color:'#8b5cf6'},
+  {key:'skip', label:'❌ 不要(解析せず)', color:'#64748b'},
+];
+
+$('#btnDriveFetch').onclick = async ()=>{
+  const url = $('#driveFolderUrl').value.trim();
+  const folderId = parseDriveFolderId(url);
+  if(!folderId){ showToast('正しいフォルダURL/IDを入力してください','error'); return; }
+  if(!STATE.driveKey){ showToast('Google Drive APIキーを画面右上から登録してください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキーも必要です（画面右上から登録）','error'); return; }
+
+  const status = $('#driveFiles');
+  status.innerHTML = '<div style="color:var(--blue);font-size:12px">📡 Driveからファイル一覧を取得中…</div>';
+
+  try{
+    const files = await driveListFolder(folderId);
+    if(!files.length){
+      status.innerHTML = '<div style="color:var(--red);font-size:12px">⚠ フォルダ内にファイルがありません（公開設定を確認してください）</div>';
+      return;
+    }
+    renderDriveFileSelector(files);
+  } catch(err){
+    status.innerHTML = `<div style="color:var(--red);font-size:12px">❌ ${err.message}</div>`;
+    showToast('Drive取込失敗: '+err.message,'error');
+  }
+};
+
+/* ファイル一覧→振り分け選択UI */
+function renderDriveFileSelector(files){
+  const status = $('#driveFiles');
+  const rowsHtml = files.map((f,i)=>{
+    const cat = categorizeDriveFile(f);
+    const sizeMB = (Number(f.size||0)/1024/1024).toFixed(2);
+    const sizeStr = f.size ? `${sizeMB}MB` : '—';
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid rgba(255,255,255,0.06)">
+        <span style="font-size:10px;color:var(--sub);min-width:24px;text-align:right">${i+1}.</span>
+        <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">${f.name}</span>
+        <span style="font-size:10px;color:var(--sub);min-width:60px;text-align:right">${sizeStr}</span>
+        <select class="drive-cat" data-idx="${i}" style="padding:5px 8px;font-size:11px;min-width:170px;border-radius:6px;border:1px solid var(--card-border);background:rgba(0,0,0,0.4);color:var(--text);font-family:inherit">
+          ${DRIVE_CATEGORIES.map(c=>`<option value="${c.key}" ${c.key===cat?'selected':''}>${c.label}</option>`).join('')}
+        </select>
+      </div>`;
+  }).join('');
+
+  status.innerHTML = `
+    <div style="margin-top:12px;padding:14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;font-weight:700">📦 ${files.length}件のファイルを取得</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="btnAutoCat" style="padding:5px 10px;font-size:10px" title="ファイル名から再判定">🔄 自動振分</button>
+          <button class="btn btn-ghost" id="btnAllSkip" style="padding:5px 10px;font-size:10px">全て不要に</button>
+          <button class="btn btn-ghost" id="btnAllMap" style="padding:5px 10px;font-size:10px">全て物件資料に</button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--sub);margin-bottom:8px">各ファイルの種別を確認して、不要なら「❌ 不要」に。確定後「✅ 選択分のみ解析」ボタンで処理開始。</div>
+      <div style="max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:4px">
+        ${rowsHtml}
+      </div>
+      <div id="driveSelSummary" style="margin-top:10px;padding:8px;background:rgba(14,165,233,0.06);border-radius:6px;font-size:11px"></div>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-primary" id="btnProcessSelected">✅ 選択分のみダウンロード＆AI解析</button>
+      </div>
+    </div>`;
+
+  // 一括変更
+  $('#btnAutoCat').onclick = ()=>{
+    $$('.drive-cat').forEach(s=>{ s.value = categorizeDriveFile(files[Number(s.dataset.idx)]); });
+    updateDriveSummary(files);
+  };
+  $('#btnAllSkip').onclick = ()=>{ $$('.drive-cat').forEach(s=>s.value = 'skip'); updateDriveSummary(files); };
+  $('#btnAllMap').onclick  = ()=>{ $$('.drive-cat').forEach(s=>{ if(s.value==='skip') s.value='map'; }); updateDriveSummary(files); };
+  $$('.drive-cat').forEach(s=>s.addEventListener('change', ()=>updateDriveSummary(files)));
+  updateDriveSummary(files);
+
+  // 確定→ダウンロード＆解析
+  $('#btnProcessSelected').onclick = ()=>processDriveSelected(files);
+}
+
+function updateDriveSummary(files){
+  const counts = {deed:0, map:0, rr:0, exp:0, tax:0, skip:0};
+  let totalMB = 0;
+  $$('.drive-cat').forEach(s=>{
+    const cat = s.value;
+    counts[cat] = (counts[cat]||0) + 1;
+    if(cat !== 'skip') totalMB += Number(files[Number(s.dataset.idx)].size||0)/1024/1024;
+  });
+  const procCount = files.length - counts.skip;
+  $('#driveSelSummary').innerHTML = `
+    <b>解析対象 ${procCount}件 / 全${files.length}件</b>
+    （📄謄本${counts.deed} / 🗺️資料${counts.map} / 📊RR${counts.rr} / 📑収支${counts.exp} / 🏛税${counts.tax} / ❌不要${counts.skip}）
+    <span style="color:var(--sub)">合計 ${totalMB.toFixed(1)}MB ダウンロード予定</span>`;
+}
+
+async function processDriveSelected(files){
+  const selections = {deed:[], map:[], rr:[], exp:[], tax:[]};
+  $$('.drive-cat').forEach(s=>{
+    const cat = s.value;
+    const idx = Number(s.dataset.idx);
+    if(cat !== 'skip') selections[cat].push(files[idx]);
+  });
+  const totalCount = Object.values(selections).reduce((a,b)=>a+b.length, 0);
+  if(!totalCount){ showToast('解析対象がありません（全て不要にチェックされています）','error'); return; }
+
+  const log = $('#driveSelSummary');
+  log.innerHTML = `<div style="color:var(--blue)">📥 ${totalCount}件をダウンロード中…</div>`;
+
+  // ダウンロード実行
+  let dlCount = 0;
+  for(const cat of Object.keys(selections)){
+    for(const driveFile of selections[cat]){
+      try{
+        const file = await driveDownloadFile(driveFile);
+        if(!file) continue;
+        STATE.files[cat] = (STATE.files[cat]||[]).concat([file]);
+        dlCount++;
+        log.innerHTML = `<div style="color:var(--blue)">📥 ダウンロード中… ${dlCount}/${totalCount}</div>`;
+        // 該当アップロード欄のチップ表示
+        const cId = cat==='deed'?'#deedFiles':cat==='map'?'#mapFiles':cat==='rr'?'#rrFiles':cat==='exp'?'#expFiles':'#taxFiles';
+        if($(cId)){
+          const chip = document.createElement('span');
+          chip.className = 'file-chip';
+          chip.innerHTML = `📎 ${driveFile.name} <span style="color:var(--sub)">(${(file.size/1024).toFixed(0)}KB)</span>`;
+          $(cId).appendChild(chip);
+        }
+      } catch(e){
+        console.warn('skip', driveFile.name, e);
+      }
+    }
+  }
+  log.innerHTML = `<div style="color:var(--green)">✅ ${dlCount}件 ダウンロード完了 → AI解析を順次実行</div>`;
+
+  // 該当カテゴリのOCRを順次起動
+  const hasPropFiles = selections.deed.length + selections.map.length > 0;
+  if(hasPropFiles){
+    log.insertAdjacentHTML('beforeend','<div style="color:var(--blue);margin-top:4px">🤖 物件情報AI解析中…</div>');
+    await $('#btnOcrBasic').onclick();
+  }
+  if(selections.rr.length){
+    log.insertAdjacentHTML('beforeend','<div style="color:var(--blue);margin-top:4px">🤖 レントロールAI解析中…</div>');
+    await $('#btnOcrRR').onclick();
+  }
+  if(selections.exp.length){
+    log.insertAdjacentHTML('beforeend','<div style="color:var(--blue);margin-top:4px">🤖 収支報告書AI解析中（STEP3）…</div>');
+    await $('#btnOcrExp').onclick();
+  }
+  if(selections.tax.length){
+    log.insertAdjacentHTML('beforeend','<div style="color:var(--blue);margin-top:4px">🤖 固定資産税AI解析中（STEP3）…</div>');
+    await $('#btnOcrTax').onclick();
+  }
+  log.insertAdjacentHTML('beforeend','<div style="color:var(--green);margin-top:6px;font-weight:700">✅ 一括解析完了</div>');
+  showToast(`✅ ${dlCount}件を解析完了`,'success');
+}
+
+/* ---------- OCR Basic ---------- */
+async function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>res(fr.result.split(',')[1]);
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+}
+function isImg(f){ return /\.(png|jpe?g|gif|webp)$/i.test(f.name); }
+function isPdf(f){ return /\.pdf$/i.test(f.name); }
+
+/* PDFを画像化（JPEG）- 5MB制限内に収まるよう自動scaleダウン */
+async function pdfToImages(file, initialScale=2.0){
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+  const MAX_BYTES = 4.5 * 1024 * 1024; // 5MB制限の安全マージン
+  const images = [];
+  for(let i=1; i<=pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    let scale = initialScale;
+    let blob = null;
+    let quality = 0.92;
+    // サイズが収まるまで scale または quality を下げて再試行
+    for(let attempt=0; attempt<6; attempt++){
+      const viewport = page.getViewport({scale});
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height); // JPEG用に背景白埋め
+      await page.render({canvasContext:ctx, viewport}).promise;
+      blob = await new Promise(r=>canvas.toBlob(r, 'image/jpeg', quality));
+      if(blob && blob.size <= MAX_BYTES) break;
+      // 大きすぎる → 段階的に縮小
+      if(scale > 1.2) scale *= 0.7;
+      else quality = Math.max(0.6, quality - 0.1);
+    }
+    const f2 = new File([blob], file.name.replace(/\.pdf$/i,'')+`_p${i}.jpg`, {type:'image/jpeg'});
+    images.push(f2);
+  }
+  return images;
+}
+
+/* 画像ファイルを5MB以下に圧縮 */
+async function shrinkImageIfNeeded(file){
+  const MAX_BYTES = 4.5 * 1024 * 1024;
+  if(file.size <= MAX_BYTES) return file;
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res,rej)=>{
+      const i = new Image();
+      i.onload = ()=>res(i);
+      i.onerror = rej;
+      i.src = url;
+    });
+    let scale = 1.0;
+    let quality = 0.9;
+    let blob = null;
+    for(let attempt=0; attempt<6; attempt++){
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      blob = await new Promise(r=>canvas.toBlob(r, 'image/jpeg', quality));
+      if(blob && blob.size <= MAX_BYTES) break;
+      if(scale > 0.5) scale *= 0.75;
+      else quality = Math.max(0.6, quality - 0.1);
+    }
+    return new File([blob], file.name.replace(/\.[^.]+$/,'')+'_shrunk.jpg', {type:'image/jpeg'});
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function buildVisionContent(files, instruction, opts={}){
+  const content = [{type:'text', text:instruction}];
+  const usePdfToImage = opts.pdfToImage !== false;
+  for(const f of files){
+    if(isImg(f)){
+      const shrunk = await shrinkImageIfNeeded(f);
+      const b64 = await fileToBase64(shrunk);
+      const mt = shrunk.type || 'image/jpeg';
+      content.push({type:'image', source:{type:'base64', media_type:mt, data:b64}});
+    } else if(isPdf(f)){
+      if(usePdfToImage && window.pdfjsLib){
+        try{
+          const imgs = await pdfToImages(f);
+          for(const img of imgs){
+            const b64 = await fileToBase64(img);
+            content.push({type:'image', source:{type:'base64', media_type:img.type||'image/jpeg', data:b64}});
+          }
+        }catch(e){
+          const b64 = await fileToBase64(f);
+          content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}});
+        }
+      } else {
+        const b64 = await fileToBase64(f);
+        content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}});
+      }
+    }
+  }
+  return content;
+}
+
+$('#btnOcrBasic').onclick = async ()=>{
+  const files = (STATE.files.deed||[]).concat(STATE.files.map||[]);
+  if(!files.length){ showToast('謄本・公図ファイルをアップロードしてください','error'); return; }
+  try{
+    showToast('AIが書類を解析しています…');
+    const prompt = `添付の不動産関連書類（謄本・公図・物件資料）から、以下の情報をJSONで抽出してください。
+土地が複数筆ある場合は lands 配列に全て列挙、建物が複数棟ある場合は buildings 配列に全て列挙してください。
+
+【重要：推測禁止】
+- 資料に明記がない項目は **null（文字列項目は ""、数値項目は 0）** を返す
+- 「推定」「類推」「相場から推測」等で値を埋めることは絶対禁止
+- 不明な築年・面積・地番・地目を勝手に入れない
+
+前置き・解説・コードブロック装飾は不要、JSONのみ。
+
+{
+  "name": "物件名",
+  "zip": "郵便番号",
+  "pref": "都道府県",
+  "city": "市区町村",
+  "addr": "番地・建物名",
+  "lands": [
+    {"chiban": "地番（例 123-4）", "chimoku": "地目（宅地/雑種地/田/畑/山林等）", "area": 面積㎡数値, "note": "備考"}
+  ],
+  "buildings": [
+    {"name": "建物名/種類（例 本館/A棟）", "struct": "構造（RC/SRC/重量鉄骨/軽量鉄骨/木造）", "year": 築年西暦数値, "floor": 延床面積㎡数値, "note": "備考"}
+  ]
+}`;
+    const content = await buildVisionContent(files, prompt);
+    const text = await callClaude([{role:'user',content}], '', 4000, 0);
+    const data = extractJson(text);
+    if(data.name) $('#propName').value = data.name;
+    if(data.zip) $('#propZip').value = data.zip;
+    if(data.pref) $('#propPref').value = data.pref;
+    if(data.city) $('#propCity').value = data.city;
+    if(data.addr) $('#propAddr').value = data.addr;
+    if(Array.isArray(data.lands) && data.lands.length){
+      $('#landBody').innerHTML = '';
+      data.lands.forEach(l=>landAddRow(l));
+    }
+    if(Array.isArray(data.buildings) && data.buildings.length){
+      $('#bldgBody').innerHTML = '';
+      data.buildings.forEach(b=>bldgAddRow(b));
+    }
+    showToast(`物件情報を自動入力しました（土地${(data.lands||[]).length}筆／建物${(data.buildings||[]).length}棟）`,'success');
+  }catch(err){
+    showToast('OCR失敗: '+err.message,'error');
+  }
+};
+
+/* ---------- OCR Rent Roll ---------- */
+$('#btnOcrRR').onclick = async ()=>{
+  const files = STATE.files.rr||[];
+  if(!files.length){ showToast('レントロールファイルをアップロードしてください','error'); return; }
+  try{
+    // Excel/CSVは直接パース
+    for(const f of files){
+      if(/\.(xlsx|xls)$/i.test(f.name)){
+        await parseExcel(f); return;
+      }
+      if(/\.csv$/i.test(f.name)){
+        await parseCSV(f); return;
+      }
+    }
+    // PDF/画像はAI解析
+    showToast('AIがレントロールを解析しています（PDF→高解像度画像化中…）');
+    const prompt = `あなたは日本の不動産レントロール・賃貸管理報告書のエキスパートOCR解析者です。
+添付ファイルは賃貸物件の部屋ごとの賃料情報が記載された表です。以下のルールで厳密に抽出してください。
+
+【ファイル種別の判定】
+レントロール / 月次収支報告書 / 賃料明細 / 入居者一覧 のいずれも、部屋ごとの行データとして扱う。
+
+【抽出ルール】
+1. **部屋単位で1オブジェクト**、JSON配列で返す
+2. 「部屋番号」「号室」「部屋」「Room」のいずれかの列を no として取得（例: "101"）
+3. 「賃料」「家賃」「賃料等」「Rent」を rent として数値抽出（カンマ・¥・円を除去した整数）
+4. 「共益費」「管理費」「Maint」を mgmt として数値抽出（同上）
+5. **空室判定**：
+   - 入居契約者名が空欄／"空室"／"-"／"vacant"／"募集中" → vacancy:true
+   - 入居者名がある → vacancy:false
+6. **間取り plan は資料に明記がある場合のみ記載**。記載なし → plan:""（空文字）
+7. **専有面積 area は資料に明記がある場合のみ記載**。記載なし → area:0
+8. **以下の行は除外**：合計／小計／総計／TOTAL／集計／空白行
+
+【重要：推測禁止】
+- 間取りや面積が資料に書かれていない場合、**絶対に推測しない**（"1K"、"25㎡"等を勝手に入れない）
+- 賃料相場や部屋番号から類推することも禁止
+- "情報なし"なら plan:"" / area:0 で返す（ユーザーがあとからWeb調査で補完する）
+
+【特殊ケース：月次収支報告書】
+- 「賃料等」と「共益費」が別列の場合、それぞれrent/mgmtに分ける
+- 礼金・敷金・更新料・修繕費は **抽出対象外**（rentに含めない）
+- 「[新規契約]」「[退去]」等の特記事項は note に転記
+- 部屋番号が飛んでいても（101,102,103,105…）そのまま記載、欠番は補完しない
+
+【数値処理】
+- "64,500" → 64500（数値）
+- "¥3,500" → 3500
+- "-" "空欄" → 0
+- 賃料が0 or 空白なら空室の可能性あり、入居者名と合わせて判定
+
+【出力フォーマット】
+**JSONのみ、前置き・解説・コードブロック装飾なし、コメントなし。**
+出力例（資料に間取り・面積が記載されていないケース）:
+[
+  {"no":"101","plan":"","area":0,"rent":64500,"mgmt":3500,"vacancy":false,"note":""},
+  {"no":"102","plan":"","area":0,"rent":68000,"mgmt":4000,"vacancy":false,"note":""},
+  {"no":"205","plan":"","area":0,"rent":74000,"mgmt":4000,"vacancy":false,"note":"新規契約 05月02日"}
+]
+
+出力例（資料に間取り・面積が記載されているケース）:
+[
+  {"no":"101","plan":"1K","area":25.5,"rent":64500,"mgmt":3500,"vacancy":false,"note":""},
+  {"no":"102","plan":"1LDK","area":40.2,"rent":68000,"mgmt":4000,"vacancy":false,"note":""}
+]`;
+    const content = await buildVisionContent(files, prompt);
+    const text = await callClaude([{role:'user',content}], '', 8000, 0);
+    const arr = extractJson(text);
+    $('#rrBody').innerHTML = '';
+    arr.forEach(r=>rrAddRow(r));
+    showToast(`${arr.length}部屋分を自動入力しました（精度確認のため必ず目視チェックを）`,'success');
+  }catch(err){
+    showToast('レントロール解析失敗: '+err.message,'error');
+  }
+};
+
+/* ---------- 不動産ポータル ホワイトリスト（信頼できるサイトのみ採用） ---------- */
+const TRUSTED_PORTAL_DOMAINS = [
+  'suumo.jp','homes.co.jp','athome.co.jp','chintai.net','chintai.com',
+  'fudousan-japan.jp','fudousan.or.jp','fudousan.co.jp',
+  'apaman.jp','minimini.jp','pitat.com','roomstock.com','heyazukan.com',
+  'oheyasagashi.net','goodroom.jp','room-stock.com','kasaibank.com',
+  'reins.or.jp','smocca.jp','o-uccino.com','door-chintai.com',
+  'house.goo.ne.jp','realestate.yahoo.co.jp','rakumachi.jp','tobichin.com'
+];
+function isTrustedPortal(url){
+  if(!url || typeof url !== 'string') return false;
+  try{
+    const host = new URL(url).hostname.toLowerCase();
+    return TRUSTED_PORTAL_DOMAINS.some(d => host === d || host.endsWith('.'+d));
+  }catch(e){ return false; }
+}
+function siteKeyFromUrl(url){
+  try{ const h = new URL(url).hostname.toLowerCase();
+    if(h.includes('suumo')) return 'suumo';
+    if(h.includes('homes')) return 'homes';
+    if(h.includes('athome')) return 'athome';
+    if(h.includes('chintai')) return 'chintai';
+    if(h.includes('fudousan')) return 'fudousan';
+    if(h.includes('apaman')) return 'apaman';
+    if(h.includes('minimini')) return 'minimini';
+    if(h.includes('rakumachi')) return 'rakumachi';
+    if(h.includes('yahoo')) return 'yahoo';
+    return h.split('.')[0];
+  }catch(e){ return ''; }
+}
+function sanitizeNote(note){
+  if(!note) return '';
+  // URL除去
+  let n = note.replace(/https?:\/\/[^\s)］、,]+/g, '').replace(/\s+/g,' ').trim();
+  // 「出典: サイト名」の部分だけ優先抽出
+  const m = n.match(/出典[::\s]*([A-Za-z0-9ぁ-んァ-ヶ一-龯々ー]+(?:\s*\(推定\))?)/);
+  if(m){
+    const site = m[1].trim();
+    // 残りに「新規契約」等の重要情報があれば併記
+    const extra = n.match(/(新規契約[^\s。]*|退去[^\s。]*|更新[^\s。]*)/);
+    return extra ? `${extra[0]} / 出典: ${site}` : `出典: ${site}`;
+  }
+  if(/情報なし|不明/.test(n)) return '情報なし';
+  // それ以外は冒頭20文字まで
+  return n.length>20 ? n.slice(0,20)+'…' : n;
+}
+
+/* ---------- 備考の一括クリーンアップ ---------- */
+$('#btnSanitizeRR').onclick = ()=>{
+  let cleaned = 0, urlsKept = 0, urlsRemoved = 0;
+  $$('#rrBody tr').forEach(tr=>{
+    const inp = tr.querySelector('.rr-note');
+    const link = tr.querySelector('.rr-note-link');
+    const orig = inp.value || '';
+    const existingUrl = inp.dataset.url || '';
+    // input内のURL抽出
+    const m = orig.match(/https?:\/\/[^\s)］、,]+/);
+    let url = existingUrl || (m ? m[0] : '');
+    // 信頼ポータルか検証
+    if(url && !isTrustedPortal(url)){ url = ''; urlsRemoved++; }
+    else if(url) urlsKept++;
+    // noteサニタイズ
+    const newNote = sanitizeNote(orig);
+    if(newNote !== orig) cleaned++;
+    inp.value = newNote;
+    inp.dataset.url = url;
+    if(url){ link.href = url; link.title = url; link.style.display = 'inline-flex'; }
+    else { link.href = '#'; link.style.display = 'none'; }
+  });
+  showToast(`🧹 クリーン完了 — 備考整形 ${cleaned}件 / URL保持 ${urlsKept}件 / 無効URL除去 ${urlsRemoved}件`,'success');
+};
+
+/* ---------- 不動産ポータルWeb検索で間取り・面積を補完 ---------- */
+$('#btnWebFillRR').onclick = async ()=>{
+  collectAll();
+  const b = STATE.basic;
+  if(!b.name && !b.addr){ showToast('STEP1で物件名または所在地を入力してください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const rows = $$('#rrBody tr');
+  // レントロール空判定：行がない or 全行で部屋番号と賃料が空
+  const isEmpty = !rows.length || rows.every(tr=>!tr.querySelector('.rr-no').value && !parseMoney(tr.querySelector('.rr-rent').value));
+
+  if(isEmpty){
+    await fetchMarketRoomsFromWeb();
+    return;
+  }
+
+  const targets = rows.map(tr=>({
+    no: tr.querySelector('.rr-no').value,
+    rent: parseMoney(tr.querySelector('.rr-rent').value),
+    area: Number(tr.querySelector('.rr-area').value)||0,
+    plan: tr.querySelector('.rr-plan').value,
+    _tr: tr
+  })).filter(r=>r.no);
+
+  const need = targets.filter(r=>!r.area || !r.plan);
+  if(!need.length){ showToast('全部屋の間取り・面積は入力済みです','info'); return; }
+
+  const out = $('#webFillResult');
+  out.innerHTML = `<div style="padding:10px;border-radius:10px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);font-size:12px;color:var(--blue)">🔍 ${need.length}部屋の間取り・面積を不動産ポータル（SUUMO/HOMES/athome等）から検索中…（30秒〜2分）</div>`;
+
+  try{
+    const prompt = `日本の不動産ポータルサイト（SUUMO、LIFULL HOME'S、athome、不動産ジャパン、CHINTAI 等）をWeb検索し、以下の賃貸物件の各部屋の間取り・専有面積を調査してください。
+
+【物件情報】
+- 物件名: ${b.name||'(不明)'}
+- 所在地: ${b.pref||''}${b.city||''}${b.addr||''}
+- 郵便番号: ${b.zip||'(不明)'}
+- 構造: ${b.struct||'(不明)'}
+- 築年: ${b.year||'(不明)'}年
+- 総戸数: ${b.units||targets.length}戸
+
+【調査対象部屋】
+${targets.map(r=>`- ${r.no}号室（現在月額賃料 ¥${r.rent.toLocaleString()}）`).join('\n')}
+
+【調査手順】
+1. まず物件名と所在地で検索（"${b.name} ${b.pref}${b.city}" 等のクエリ）
+2. SUUMO/HOMES/athomeの該当物件ページが見つかれば、各部屋の間取り（1K/1LDK等）と専有面積（㎡）を読み取る
+3. 同物件の過去掲載・現在掲載の両方を確認
+4. 部屋番号が一致しなくても、賃料・階数から類推して当てる
+5. 完全一致がなければ、同じ物件名の類似間取りから推定（"推定"と明記）
+
+【重要ルール（必ず厳守・違反厳禁）】
+1. **note には絶対にURLを含めない**
+2. **note は最大20文字以内**。"出典: SUUMO" "出典: HOMES" "出典: athome" のような短い形式のみ
+3. **長文の推測説明を書かない**（"1階部屋が専有面積…記載" のような長文禁止）
+4. **個別企業サイト（例: Faiz company, 〇〇不動産）を出典にしない**。SUUMO/HOMES/athome/CHINTAI のみ
+5. 推定の場合は "出典: SUUMO (推定)" のみ（理由説明は不要）
+6. 取得不能な部屋は area=0, plan="" とし、note に "情報なし" と記載
+
+【出力フォーマット】
+JSONのみ、前置き・解説・コードブロック装飾なし。
+
+[
+  {"no":"101","plan":"1K","area":25.5,"note":"出典: SUUMO"},
+  {"no":"102","plan":"1LDK","area":40.2,"note":"出典: HOMES (推定)"},
+  {"no":"103","plan":"","area":0,"note":"情報なし"}
+]`;
+
+    const result = await callClaudeWithSearch(
+      [{role:'user', content: prompt}],
+      '',
+      6000,
+      6  // 最大検索回数
+    );
+
+    const arr = extractJson(result.text);
+
+    // 信頼ポータルだけにcitationsフィルタ
+    const citList = (result.citations || []).filter(c => isTrustedPortal(c.url));
+
+    function findCitForNote(noteText){
+      const lower = (noteText||'').toLowerCase();
+      const keys = ['suumo','homes','athome','chintai','fudousan','apaman','minimini','rakumachi'];
+      for(const k of keys){
+        if(lower.includes(k)){
+          const hit = citList.find(c => siteKeyFromUrl(c.url) === k);
+          if(hit) return hit.url;
+        }
+      }
+      return citList[0]?.url || '';
+    }
+
+    // テーブル更新（空欄のみ上書き）
+    let updated = 0, found = 0;
+    arr.forEach(r=>{
+      const target = targets.find(t=>String(t.no)===String(r.no));
+      if(!target) return;
+      let changed = false;
+      if(r.plan && !target._tr.querySelector('.rr-plan').value){
+        target._tr.querySelector('.rr-plan').value = r.plan;
+        changed = true;
+      }
+      if(r.area>0 && !target._tr.querySelector('.rr-area').value){
+        target._tr.querySelector('.rr-area').value = r.area;
+        changed = true;
+      }
+      const noteInp = target._tr.querySelector('.rr-note');
+      const link = target._tr.querySelector('.rr-note-link');
+      const cleanNote = sanitizeNote(r.note);
+      if(cleanNote && !noteInp.value){ noteInp.value = cleanNote; }
+      const url = (r.plan || r.area>0) ? findCitForNote(cleanNote) : '';
+      if(url && isTrustedPortal(url)){
+        noteInp.dataset.url = url;
+        link.href = url;
+        link.title = url;
+        link.style.display = 'inline-flex';
+      } else {
+        link.style.display = 'none';
+      }
+      if(r.plan || r.area>0) found++;
+      if(changed) updated++;
+    });
+    recalcRR();
+    const suspicious = 0;
+
+    const citations = result.citations || [];
+    const susHtml = suspicious>0 ? `
+      <div style="margin-top:6px;font-size:11px;color:var(--orange)">⚠ ${suspicious}部屋は出典URL不確実 → 備考欄の「⚠要確認」をチェック</div>` : '';
+
+    out.innerHTML = `
+      <div style="padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3)">
+        <div style="font-size:12px;color:var(--green);font-weight:700">✅ Web調査完了 — 情報取得 ${found}/${need.length} 部屋 ／ 更新 ${updated} 部屋（備考の 🌐 アイコンから出典確認できます）</div>
+        ${susHtml}
+      </div>`;
+
+    // STATE に出典を保持（PDFレポートで引用）
+    STATE.rrCitations = citations;
+
+    showToast(`✅ ${updated}部屋を更新（参考URL ${citations.length}件）`,'success');
+  }catch(err){
+    out.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);font-size:12px;color:var(--red)">❌ ${err.message}</div>`;
+    showToast('Web調査失敗: '+err.message,'error');
+  }
+};
+
+/* レントロール表が無い場合：Web検索で募集賃料から仮テーブル作成 */
+async function fetchMarketRoomsFromWeb(){
+  const b = STATE.basic;
+  const out = $('#webFillResult');
+  out.innerHTML = `<div style="padding:10px;border-radius:10px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);font-size:12px;color:var(--blue)">🔍 レントロール未入力 → 不動産ポータルの<b>募集賃料</b>から仮レントロールを作成中…（30秒〜2分）</div>`;
+
+  try{
+    const prompt = `日本の不動産ポータルサイト（SUUMO、LIFULL HOME'S、athome、不動産ジャパン、CHINTAI 等）をWeb検索し、以下の賃貸物件で **募集中・過去募集の部屋情報** を取得してください。
+レントロールが手元にないため、Web上の募集情報から仮レントロールを構築します。
+
+【物件情報】
+- 物件名: ${b.name||'(不明)'}
+- 所在地: ${b.pref||''}${b.city||''}${b.addr||''}
+- 構造: ${b.struct||'(不明)'}
+- 築年: ${b.year||'(不明)'}年
+- 総戸数: ${b.units||'(不明)'}戸
+
+【調査手順】
+1. 物件名と所在地で検索（"${b.name} ${b.pref}${b.city}" 等）
+2. 現在募集中の部屋すべてを取得
+3. 過去掲載の事例も含めて、各部屋の以下を抽出：
+   - 部屋番号（不明なら "1階A","1階B"等の便宜的な番号）
+   - 間取り、専有面積
+   - 募集賃料、管理費・共益費
+   - 出典URL
+4. 部屋番号が不明でも、戸数分を「同じ間取りの代表値」で複製してもよい（その場合 note に "募集事例より仮"と明記）
+
+【重要】
+- 推測禁止：実際の掲載情報のみ使用
+- **note には絶対にURLを書かない**（URLは別途web_search結果として自動収集）
+- note は「出典: SUUMO」のようにサイト名のみ
+- 賃料はその部屋の **募集賃料**（管理費含まない金額）
+- 全室空室として vacancy:false で初期作成
+
+【出力フォーマット】
+JSONのみ、前置き不要、コードブロック装飾不要。
+
+[
+  {"no":"101","plan":"1K","area":25.5,"rent":68000,"mgmt":3000,"vacancy":false,"note":"出典: SUUMO"},
+  ...
+]`;
+
+    const result = await callClaudeWithSearch(
+      [{role:'user', content: prompt}],
+      '',
+      8000,
+      8
+    );
+    const arr = extractJson(result.text);
+    if(!Array.isArray(arr) || !arr.length){
+      out.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);font-size:12px;color:var(--orange)">⚠ 募集情報が見つかりませんでした。物件名・所在地を見直してください。</div>`;
+      return;
+    }
+
+    // 信頼ポータルだけにcitationsフィルタ
+    const citList = (result.citations || []).filter(c => isTrustedPortal(c.url));
+    function pickUrl(noteText){
+      const lower = (noteText||'').toLowerCase();
+      const keys = ['suumo','homes','athome','chintai','fudousan','apaman','minimini'];
+      for(const k of keys){
+        if(lower.includes(k)){
+          const hit = citList.find(c=>siteKeyFromUrl(c.url)===k);
+          if(hit) return hit.url;
+        }
+      }
+      return citList[0]?.url || '';
+    }
+    // 既存行をクリアして投入（noteは強制サニタイズ）
+    $('#rrBody').innerHTML = '';
+    arr.forEach(r=>{
+      r.note = sanitizeNote(r.note);
+      const candidate = pickUrl(r.note);
+      r._url = isTrustedPortal(candidate) ? candidate : '';
+      rrAddRow(r);
+    });
+    STATE.rrCitations = citList;
+
+    out.innerHTML = `
+      <div style="padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3)">
+        <div style="font-size:12px;color:var(--green);font-weight:700">✅ 募集情報から仮レントロール作成完了 — ${arr.length}部屋（備考の 🌐 アイコンから出典確認）</div>
+        <div style="font-size:11px;color:var(--orange);margin-top:4px">⚠ 募集賃料ベースのため実際の入居賃料とは異なる場合があります。後で正式レントロールが入手できたら差し替えてください。</div>
+      </div>`;
+    showToast(`✅ 仮レントロール作成 ${arr.length}部屋`,'success');
+  }catch(err){
+    out.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);font-size:12px;color:var(--red)">❌ ${err.message}</div>`;
+    showToast('募集情報取得失敗: '+err.message,'error');
+  }
+}
+
+async function parseExcel(file){
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data,{type:'array'});
+  const sh = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sh,{header:1, defval:''});
+  importTableData(json);
+}
+async function parseCSV(file){
+  const text = await file.text();
+  const rows = text.split(/\r?\n/).map(l=>l.split(','));
+  importTableData(rows);
+}
+function importTableData(rows){
+  if(!rows.length){ showToast('データが空です','error'); return; }
+  // ヘッダ行を判定（部屋/号室/番号 を含む行）
+  let hi = 0;
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    if(rows[i].some(c=>/部屋|号室|間取|賃料|号|番号/.test(String(c)))){ hi=i; break; }
+  }
+  const headers = rows[hi].map(h=>String(h).trim());
+  const idx = (re)=>headers.findIndex(h=>re.test(h));
+  const iNo = idx(/部屋|号室|号|番号/);
+  const iPlan = idx(/間取/);
+  const iArea = idx(/面積|㎡/);
+  const iRent = idx(/賃料|家賃/);
+  const iMgmt = idx(/管理|共益/);
+  const iVac = idx(/空室|空き|status/i);
+  const iNote = idx(/備考|note/i);
+
+  $('#rrBody').innerHTML = '';
+  let count = 0;
+  for(let i=hi+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || r.every(c=>!String(c).trim())) continue;
+    const rent = parseMoney(r[iRent]);
+    if(!rent) continue;
+    rrAddRow({
+      no: r[iNo]||'',
+      plan: r[iPlan]||'',
+      area: Number(String(r[iArea]).replace(/[^\d.]/g,''))||0,
+      rent: rent,
+      mgmt: parseMoney(r[iMgmt]),
+      vacancy: /空|true|vacant/i.test(String(r[iVac]||'')),
+      note: r[iNote]||''
+    });
+    count++;
+  }
+  showToast(`${count}部屋分を読み込みました`,'success');
+}
+
+/* =========================================================
+ *  PDF Report Generation
+ * ========================================================= */
+function buildReportHTML(){
+  const R = STATE.result, b = STATE.basic, e = STATE.expenses, m = STATE.market, a = STATE.areaInfo;
+  const today = new Date().toLocaleDateString('ja-JP');
+  const evalName = e.evalName || '—';
+  const comment = ($('#evalComment').value || '—').replace(/\n/g,'<br>');
+  const addr = `${b.pref||''} ${b.city||''} ${b.addr||''}`;
+  const age = b.year ? (new Date().getFullYear()-b.year) : 0;
+  const diff = R.modelB && R.priceMid>0 ? ((R.modelB.mid-R.priceMid)/R.priceMid*100) : 0;
+
+  // 用語集を3カテゴリずつ2ページに分割
+  const allCats = [...new Set(GLOSSARY.map(g=>g.cat))];
+  const half = Math.ceil(allCats.length/2);
+  const cats1 = allCats.slice(0, half);
+  const cats2 = allCats.slice(half);
+  const TOTAL = 6;
+
+  const pageFooter = (n) => `
+    <div class="pdf-footer">
+      <div>${b.name||'—'} 査定報告書</div>
+      <div>Page ${n} / ${TOTAL}</div>
+    </div>`;
+
+  return `
+  <!-- ===== PAGE 1 : 表紙＋査定サマリー ===== -->
+  <div class="pdf-page">
+    <h1>収益物件 査定報告書</h1>
+    <div class="pdf-cover-title">${b.name||'物件名未設定'}</div>
+    <div class="pdf-cover-sub">${addr}</div>
+
+    <div class="pdf-cover-meta">
+      <div><div class="lbl">査定日</div><div class="val">${today}</div></div>
+      <div><div class="lbl">所在地</div><div class="val">${addr}</div></div>
+      <div><div class="lbl">構造／築年</div><div class="val">${b.struct||'—'} ／ ${b.year?b.year+'年（築'+age+'年）':'—'}</div></div>
+      <div><div class="lbl">総戸数／延床</div><div class="val">${b.units}戸 ／ ${(b.floor||0).toFixed(2)}㎡</div></div>
+      <div><div class="lbl">査定者</div><div class="val">${evalName}</div></div>
+    </div>
+
+    <h2>査定サマリー</h2>
+    <div class="pdf-price-row">
+      <div class="pdf-price-card up"><div class="lbl">上振れ値</div><div class="val">${fmtMan(R.priceUp)}</div><div class="yld">CAP ${R.capMin.toFixed(2)}%</div></div>
+      <div class="pdf-price-card mid"><div class="lbl">査定中央値</div><div class="val">${fmtMan(R.priceMid)}</div><div class="yld">CAP ${R.capMid.toFixed(2)}%</div></div>
+      <div class="pdf-price-card low"><div class="lbl">下限値</div><div class="val">${fmtMan(R.priceLow)}</div><div class="yld">CAP ${R.capMax.toFixed(2)}%</div></div>
+    </div>
+
+    <h3 style="margin-top:14px">主要指標</h3>
+    <div class="pdf-kpi-row">
+      <div class="pdf-kpi"><div class="l">満室想定 表面利回り</div><div class="v">${fmtP(R.grossYield)}</div></div>
+      <div class="pdf-kpi"><div class="l">現況 表面利回り</div><div class="v">${fmtP(R.curYield)}</div></div>
+      <div class="pdf-kpi"><div class="l">NOI利回り</div><div class="v">${fmtP(R.noiYield)}</div></div>
+      <div class="pdf-kpi"><div class="l">投資回収年数</div><div class="v">${R.paybackY.toFixed(1)}年</div></div>
+    </div>
+
+    <h3 style="margin-top:14px">2モデル比較</h3>
+    <table class="pdf-table">
+      <tr><th style="width:30%">モデル</th><th style="width:25%">査定価格(中央値)</th><th>備考</th></tr>
+      <tr><td>Model A 収益還元法</td><td class="num">${fmtMan(R.priceMid)}</td><td>NOI ÷ CAP ${R.capMid.toFixed(2)}%</td></tr>
+      <tr><td>Model B 相場価格モデル</td><td class="num">${R.modelB?fmtMan(R.modelB.mid):'—'}</td><td>延床${(b.floor||0).toFixed(0)}㎡ × ${R.modelB?R.modelB.sqmMid.toFixed(1):'—'}万円/㎡</td></tr>
+      <tr class="total"><td>乖離率</td><td class="num">${diff.toFixed(1)}%</td><td>${Math.abs(diff)>20?'⚠ 要再検証':'妥当範囲'}</td></tr>
+    </table>
+
+    ${pageFooter(1)}
+  </div>
+
+  <!-- ===== PAGE 2 : 物件概要（スペック・土地・建物） ===== -->
+  <div class="pdf-page">
+    <h1>物件概要</h1>
+    <h2>物件スペック</h2>
+    <table class="pdf-table">
+      <tr><th style="width:22%">物件名</th><td>${b.name||'—'}</td><th style="width:22%">郵便番号</th><td>${b.zip||'—'}</td></tr>
+      <tr><th>所在地</th><td colspan="3">${addr}</td></tr>
+      <tr><th>代表構造</th><td>${b.struct||'—'}</td><th>築年（最古）</th><td>${b.year?b.year+'年（築'+age+'年）':'—'}</td></tr>
+      <tr><th>総戸数</th><td>${b.units}戸</td><th>現況</th><td>${b.status||'—'}</td></tr>
+      <tr><th>延床面積(合計)</th><td>${(b.floor||0).toFixed(2)} ㎡</td><th>土地面積(合計)</th><td>${(b.land||0).toFixed(2)} ㎡（${((b.land||0)*0.3025).toFixed(2)}坪）</td></tr>
+      <tr><th>駐車場</th><td>${b.park}台</td><th>駐車場月額</th><td>${fmtY(b.parkFee)}/台</td></tr>
+    </table>
+
+    <h2>土地明細（${(b.lands||[]).length}筆）</h2>
+    <table class="pdf-table">
+      <tr><th>地番</th><th>地目</th><th>面積（㎡）</th><th>備考</th></tr>
+      ${(b.lands||[]).map(l=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="num">${(l.area||0).toFixed(2)}</td><td>${l.note||''}</td></tr>`).join('')}
+      <tr class="total"><td colspan="2">合計</td><td class="num">${(b.land||0).toFixed(2)}</td><td></td></tr>
+    </table>
+
+    <h2>建物明細（${(b.buildings||[]).length}棟）</h2>
+    <table class="pdf-table">
+      <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床（㎡）</th><th>備考</th></tr>
+      ${(b.buildings||[]).map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="num">${bb.year||'—'}</td><td class="num">${(bb.floor||0).toFixed(2)}</td><td>${bb.note||''}</td></tr>`).join('')}
+      <tr class="total"><td colspan="3">合計</td><td class="num">${(b.floor||0).toFixed(2)}</td><td>総戸数 ${b.units}戸</td></tr>
+    </table>
+
+    ${pageFooter(2)}
+  </div>
+
+  <!-- ===== PAGE 3 : 年間収支＋レントロール ===== -->
+  <div class="pdf-page">
+    <h1>年間収支 ／ レントロール</h1>
+    <h2>年間収支（中央値ベース）</h2>
+    <table class="pdf-table">
+      <tr><th style="width:60%">項目</th><th>年額</th></tr>
+      <tr><td>満室想定賃料 (GPI)</td><td class="num">${fmtY(R.GPI)}</td></tr>
+      <tr><td>空室損失（${(R.vacancyRate*100).toFixed(1)}%）</td><td class="num">▲ ${fmtY(R.vacancyLoss)}</td></tr>
+      <tr><td><b>実効総収入 (EGI)</b></td><td class="num"><b>${fmtY(R.EGI)}</b></td></tr>
+      <tr><td>　管理委託費（${e.mgmtRate}%）</td><td class="num">${fmtY(R.mgmtFee)}</td></tr>
+      <tr><td>　修繕積立金</td><td class="num">${fmtY(R.repairY)}</td></tr>
+      <tr><td>　固定資産税・都市計画税</td><td class="num">${fmtY(e.tax)}</td></tr>
+      <tr><td>　火災・地震保険料</td><td class="num">${fmtY(e.ins)}</td></tr>
+      <tr><td>　その他経費</td><td class="num">${fmtY(e.etc)}</td></tr>
+      <tr><td><b>年間経費 (OPEX)</b></td><td class="num"><b>▲ ${fmtY(R.OPEX)}</b></td></tr>
+      <tr class="total"><td>純営業収益 (NOI)</td><td class="num">${fmtY(R.NOI)}</td></tr>
+    </table>
+
+    <h2>レントロール（${STATE.rentRoll.length}戸）</h2>
+    <table class="pdf-table">
+      <tr><th>部屋</th><th>間取</th><th>㎡</th><th>賃料</th><th>管理費</th><th style="width:50px">状態</th></tr>
+      ${STATE.rentRoll.map(r=>`<tr>
+        <td>${r.no||''}</td><td>${r.plan||''}</td><td class="num">${r.area||''}</td>
+        <td class="num">${fmtY(r.rent)}</td><td class="num">${fmtY(r.mgmt)}</td>
+        <td>${r.vacancy?'<span style="color:#ef4444">空室</span>':'<span style="color:#10b981">入居</span>'}</td>
+      </tr>`).join('')}
+    </table>
+    ${(STATE.rrCitations && STATE.rrCitations.length) ? `
+      <div style="margin-top:4px;font-size:9px;color:#64748b">※間取り・面積は不動産ポータル(Web調査)由来の場合あり。各部屋の備考参照。</div>` : ''}
+
+    ${pageFooter(3)}
+  </div>
+
+  <!-- ===== PAGE 4 : エリア情報＋相場根拠 ===== -->
+  <div class="pdf-page">
+    <h1>エリア情報 ／ 近隣相場</h1>
+    ${a ? `
+    <h2>法規制・インフラ</h2>
+    <table class="pdf-table">
+      <tr><th style="width:22%">用途地域</th><td>${a.youto_chiiki||'—'}</td><th style="width:22%">建ぺい/容積</th><td>${a.kenpei||'—'} / ${a.yoseki||'—'}</td></tr>
+      <tr><th>都市計画区分</th><td>${a.toshi_keikaku||'—'}</td><th>防火地域</th><td>${a.boukaku||'—'}</td></tr>
+      <tr><th>高度地区</th><td>${a.koudo||'—'}</td><th>接道状況</th><td>${a.douro||'—'}</td></tr>
+      <tr><th>電気/ガス</th><td>${a.lifeline?.denki||'—'} / ${a.lifeline?.gas||'—'}</td><th>上水/下水</th><td>${a.lifeline?.suidou||'—'} / ${a.lifeline?.gesui||'—'}</td></tr>
+      <tr><th>土壌・水質</th><td colspan="3">${a.dosjou_osen||'—'} ／ ${a.suishitsu||'—'}</td></tr>
+      <tr><th>災害リスク</th><td colspan="3">${(a.saigai_risk||[]).join(' / ')||'—'}</td></tr>
+      <tr><th>地域条例</th><td colspan="3">${(a.kisei||[]).join(' / ')||'—'}</td></tr>
+      <tr><th>最寄駅・交通</th><td>${a.transit||'—'}</td><th>周辺施設</th><td>${a.shisetsu||'—'}</td></tr>
+    </table>
+    <div class="pdf-callout"><b>エリア総評：</b>${a.souhyou||'—'}</div>
+    ` : '<div class="pdf-callout">エリア情報AI調査が未実施のためデータなし</div>'}
+
+    ${m ? `
+    <h2>採用CAP RATE・㎡単価相場帯</h2>
+    <table class="pdf-table">
+      <tr><th>区分</th><th>CAP %</th><th>査定価格</th><th>㎡単価</th></tr>
+      <tr><td>下限（強気）</td><td class="num">${R.capMin.toFixed(2)}</td><td class="num">${fmtMan(R.priceUp)}</td><td class="num">${m.price_per_sqm?.min?.toFixed(1)||'—'} 万円/㎡</td></tr>
+      <tr><td>中央値（標準）</td><td class="num">${R.capMid.toFixed(2)}</td><td class="num">${fmtMan(R.priceMid)}</td><td class="num">${m.price_per_sqm?.mid?.toFixed(1)||'—'} 万円/㎡</td></tr>
+      <tr><td>上限（保守）</td><td class="num">${R.capMax.toFixed(2)}</td><td class="num">${fmtMan(R.priceLow)}</td><td class="num">${m.price_per_sqm?.max?.toFixed(1)||'—'} 万円/㎡</td></tr>
+    </table>
+    <div class="pdf-grid-2">
+      <div>
+        <h3>▲ エリア強み</h3>
+        <div>${(m.strength_factors||[]).map(s=>`<span class="pdf-tag strength">${s}</span>`).join(' ')}</div>
+      </div>
+      <div>
+        <h3>▼ リスク要因</h3>
+        <div>${(m.risk_factors||[]).map(s=>`<span class="pdf-tag risk">${s}</span>`).join(' ')}</div>
+      </div>
+    </div>
+    <div class="pdf-callout"><b>採用CAP根拠：</b>${m.market_comment||''}</div>
+    <div class="pdf-callout"><b>エリア動向：</b>${m.area_trend||''}</div>
+    ` : '<div class="pdf-callout">AI相場調査未実施のため標準値で算出</div>'}
+
+    ${pageFooter(4)}
+  </div>
+
+  <!-- ===== PAGE 5 : 将来予測＋AI所感＋査定者コメント ===== -->
+  <div class="pdf-page">
+    <h1>将来10年予測 ／ 査定者コメント</h1>
+    <h2>将来予測サマリー</h2>
+    <table class="pdf-table">
+      <tr><th style="width:25%">項目</th><th>現状</th><th>5年後</th><th>10年後</th></tr>
+      <tr><td>NOI（年額）</td><td class="num">${fmtY(R.future[0].NOI)}</td><td class="num">${fmtY(R.future[5].NOI)}</td><td class="num">${fmtY(R.future[10].NOI)}</td></tr>
+      <tr><td>CAP RATE</td><td class="num">${R.future[0].cap.toFixed(2)}%</td><td class="num">${R.future[5].cap.toFixed(2)}%</td><td class="num">${R.future[10].cap.toFixed(2)}%</td></tr>
+      <tr class="total"><td>理論価格</td><td class="num">${fmtMan(R.future[0].price)}</td><td class="num">${fmtMan(R.future[5].price)}</td><td class="num">${fmtMan(R.future[10].price)}</td></tr>
+      <tr><td>DCF 10年現在価値</td><td colspan="3" class="num">${fmtMan(R.dcfNPV)}（査定中央値の ${R.priceMid>0?(R.dcfNPV/R.priceMid*100).toFixed(1):0}%）</td></tr>
+    </table>
+    <div class="pdf-callout"><b>計算前提：</b>年間賃料下落率 ${e.rentDrop}%/年、CAP RATE +0.05%/年（築古化リスク）、OPEX一定、DCF割引率 ${e.dcfRate}%</div>
+
+    ${STATE.futureAI ? `
+    <h2>AI将来所感</h2>
+    <div class="pdf-grid-2">
+      <div>
+        <h3 style="color:#10b981">▲ 将来の強み</h3>
+        <ul style="margin:2px 0;padding-left:16px;font-size:10px">${(STATE.futureAI.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
+      </div>
+      <div>
+        <h3 style="color:#ef4444">▼ 将来リスク</h3>
+        <ul style="margin:2px 0;padding-left:16px;font-size:10px">${(STATE.futureAI.risks||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="pdf-callout"><b>出口戦略：</b>${STATE.futureAI.exit_strategy||''}</div>
+    <div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11px;font-weight:700;margin:4px 0">🎯 ${STATE.futureAI.verdict||''}</div>
+    ` : ''}
+
+    <h2>査定者コメント</h2>
+    <div class="pdf-callout" style="min-height:60px">${comment}</div>
+
+    <h2>免責事項</h2>
+    <div style="font-size:9px;color:#64748b;line-height:1.6">
+    本査定は、入力情報およびAIによる周辺相場推定値に基づく参考価格です。実勢価格は市場環境・物件個別事情により変動します。実取引・融資判断にあたっては、不動産鑑定士による正式査定および現地調査をご検討ください。AI推定値（エリア情報・相場・間取り等）は精度100%を保証するものではなく、参考情報として扱ってください。
+    </div>
+
+    ${pageFooter(5)}
+  </div>
+
+  <!-- ===== PAGE 6 : 用語集 ===== -->
+  <div class="pdf-page">
+    <h1>用語集</h1>
+    <div style="font-size:9px;color:#64748b;margin-bottom:8px">本報告書で使用する不動産投資・査定の主要用語の解説</div>
+    ${allCats.map(cat=>`
+      <h2 style="font-size:11px;margin:8px 0 3px">${cat}</h2>
+      <table class="pdf-table" style="font-size:9px">
+        <tr><th style="width:18%">用語</th><th style="width:20%">英名</th><th>説明</th></tr>
+        ${GLOSSARY.filter(g=>g.cat===cat).map(g=>`
+          <tr><td><b>${g.term}</b></td><td style="font-family:Inter;color:#475569">${g.en}</td><td>${g.desc}</td></tr>
+        `).join('')}
+      </table>
+    `).join('')}
+    ${pageFooter(6)}
+  </div>`;
+}
+
+/* =========================================================
+ *  ビュー切替（home / simulator / list / gaiyou）
+ * ========================================================= */
+function showView(v){
+  $$('.view').forEach(el=>el.classList.add('hide'));
+  const target = document.querySelector('.view-'+v);
+  if(target) target.classList.remove('hide');
+  $$('.nav-link').forEach(a=>a.classList.toggle('active', a.dataset.view===v));
+  if(v==='home') updateHomeStat();
+  if(v==='list') renderPropertyList();
+  window.scrollTo({top:0,behavior:'instant'});
+  // 印刷用クラス
+  document.body.classList.toggle('print-gaiyou', v==='gaiyou');
+}
+document.addEventListener('click', e=>{
+  const a = e.target.closest('[data-view]');
+  if(a){ e.preventDefault(); showView(a.dataset.view); }
+});
+
+/* =========================================================
+ *  物件登録一覧（localStorage管理）
+ * ========================================================= */
+const PROPLIST_KEY = 'appraisal_property_list_v1';
+const CURRENT_ID_KEY = 'appraisal_current_id';
+
+function getPropertyList(){
+  try{ return JSON.parse(localStorage.getItem(PROPLIST_KEY)||'[]'); }catch(e){ return []; }
+}
+function savePropertyList(list){
+  localStorage.setItem(PROPLIST_KEY, JSON.stringify(list));
+}
+function buildSnapshot(){
+  collectAll();
+  if(!STATE.result) STATE.result = calcAll();
+  return {
+    basic: STATE.basic,
+    expenses: STATE.expenses,
+    rentRoll: STATE.rentRoll,
+    market: STATE.market,
+    areaInfo: STATE.areaInfo,
+    futureAI: STATE.futureAI,
+    taxInfo: STATE.taxInfo,
+    rrCitations: STATE.rrCitations || [],
+    evalComment: $('#evalComment')?.value || '',
+    result: STATE.result,
+  };
+}
+
+function saveCurrentProperty(){
+  collectAll();
+  if(!STATE.basic.name && !STATE.basic.addr){
+    showToast('物件名または所在地を入力してください','error');
+    return null;
+  }
+  STATE.result = calcAll();
+  const list = getPropertyList();
+  const id = STATE.currentPropertyId || ('prop_' + Date.now() + '_' + Math.random().toString(36).slice(2,6));
+  const snap = buildSnapshot();
+  const entry = {
+    id,
+    name: STATE.basic.name || '(無名)',
+    addr: `${STATE.basic.pref||''}${STATE.basic.city||''}${STATE.basic.addr||''}`,
+    struct: STATE.basic.struct || '—',
+    year: STATE.basic.year || 0,
+    units: STATE.basic.units || 0,
+    priceMid: STATE.result?.priceMid || 0,
+    updatedAt: new Date().toISOString(),
+    snapshot: snap,
+  };
+  const idx = list.findIndex(p=>p.id===id);
+  if(idx>=0){ list[idx] = entry; }
+  else { list.unshift(entry); }
+  savePropertyList(list);
+  STATE.currentPropertyId = id;
+  localStorage.setItem(CURRENT_ID_KEY, id);
+  showToast(`✅ 物件「${entry.name}」を登録/更新しました`,'success');
+  return entry;
+}
+
+function loadProperty(id){
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===id);
+  if(!p){ showToast('物件が見つかりません','error'); return; }
+  const s = p.snapshot;
+  // 基本情報
+  const b = s.basic||{};
+  $('#propName').value = b.name||'';
+  $('#propZip').value = b.zip||'';
+  $('#propPref').value = b.pref||'';
+  $('#propCity').value = b.city||'';
+  $('#propAddr').value = b.addr||'';
+  if(Array.isArray(b.lands) && b.lands.length){ $('#landBody').innerHTML=''; b.lands.forEach(l=>landAddRow(l)); }
+  if(Array.isArray(b.buildings) && b.buildings.length){ $('#bldgBody').innerHTML=''; b.buildings.forEach(bb=>bldgAddRow(bb)); }
+  if(b.status) $('#propStatus').value = b.status;
+  if(b.park) $('#propPark').value = b.park;
+  if(b.parkFee) $('#propParkFee').value = Number(b.parkFee).toLocaleString('ja-JP');
+  // レントロール
+  if(Array.isArray(s.rentRoll) && s.rentRoll.length){
+    $('#rrBody').innerHTML='';
+    s.rentRoll.forEach(r=>{
+      const url = (r.note||'').match(/https?:\/\/[^\s)］、,]+/)?.[0];
+      r._url = (url && isTrustedPortal(url)) ? url : '';
+      r.note = sanitizeNote(r.note);
+      rrAddRow(r);
+    });
+  }
+  // 経費
+  const e = s.expenses||{};
+  if(e.mgmtRate!==undefined) $('#opMgmt').value = e.mgmtRate;
+  if(e.repair) $('#opRepair').value = Number(e.repair).toLocaleString('ja-JP');
+  if(e.tax) $('#opTax').value = Number(e.tax).toLocaleString('ja-JP');
+  if(e.ins) $('#opIns').value = Number(e.ins).toLocaleString('ja-JP');
+  if(e.etc) $('#opEtc').value = Number(e.etc).toLocaleString('ja-JP');
+  if(e.vacancy!==undefined) $('#opVacancy').value = e.vacancy;
+  if(e.capMid) $('#capMid').value = e.capMid;
+  if(e.capMin) $('#capMin').value = e.capMin;
+  if(e.capMax) $('#capMax').value = e.capMax;
+  if(e.dcfRate) $('#dcfRate').value = e.dcfRate;
+  if(e.rentDrop) $('#rentDrop').value = e.rentDrop;
+  if(e.evalName) $('#evalName').value = e.evalName;
+  // AI結果
+  STATE.market = s.market;
+  STATE.areaInfo = s.areaInfo;
+  STATE.futureAI = s.futureAI;
+  STATE.taxInfo = s.taxInfo;
+  STATE.rrCitations = s.rrCitations||[];
+  if(s.evalComment) $('#evalComment').value = s.evalComment;
+
+  STATE.currentPropertyId = id;
+  localStorage.setItem(CURRENT_ID_KEY, id);
+  showView('simulator');
+  goStep(1);
+  showToast(`物件「${p.name}」を読み込みました`,'success');
+}
+
+function duplicateProperty(id){
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===id);
+  if(!p) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = 'prop_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  copy.name = p.name + ' (複製)';
+  copy.snapshot.basic.name = copy.name;
+  copy.updatedAt = new Date().toISOString();
+  list.unshift(copy);
+  savePropertyList(list);
+  renderPropertyList();
+  showToast('物件を複製しました','success');
+}
+
+function deleteProperty(id){
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm(`物件「${p.name}」を削除しますか？（取り消し不可）`)) return;
+  savePropertyList(list.filter(x=>x.id!==id));
+  renderPropertyList();
+  showToast('削除しました','success');
+}
+
+function renderPropertyList(){
+  const list = getPropertyList();
+  const tbody = $('#propTableBody');
+  const empty = $('#propEmpty');
+  if(!list.length){
+    tbody.innerHTML='';
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+  tbody.innerHTML = list.map((p,i)=>{
+    const updated = new Date(p.updatedAt).toLocaleString('ja-JP');
+    return `
+      <tr>
+        <td>${i+1}</td>
+        <td><b>${p.name}</b></td>
+        <td style="font-size:12px;color:var(--sub)">${p.addr||'—'}</td>
+        <td style="font-size:12px">${p.struct||'—'} / ${p.year?p.year+'年':'—'}</td>
+        <td style="text-align:right;font-family:Inter">${p.units}戸</td>
+        <td style="text-align:right;font-family:Inter;color:var(--blue);font-weight:700">${p.priceMid?fmtMan(p.priceMid):'—'}</td>
+        <td style="font-size:11px;color:var(--sub)">${updated}</td>
+        <td class="prop-actions">
+          <button class="btn-ghost" onclick="loadProperty('${p.id}')" style="background:rgba(14,165,233,0.2);color:#0ea5e9">編集</button>
+          <button onclick="duplicateProperty('${p.id}')" style="background:rgba(139,92,246,0.2);color:#a78bfa">複製</button>
+          <button onclick="openGaiyou('${p.id}')" style="background:rgba(16,185,129,0.2);color:#10b981">概要書</button>
+          <button onclick="deleteProperty('${p.id}')" style="background:rgba(239,68,68,0.2);color:#ef4444">削除</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function updateHomeStat(){
+  const list = getPropertyList();
+  if(!list.length){ $('#homeStat').textContent = '登録物件なし'; return; }
+  const latest = list[0];
+  $('#homeStat').textContent = `登録物件 ${list.length}件 / 最新: ${latest.name} (${new Date(latest.updatedAt).toLocaleDateString('ja-JP')})`;
+}
+
+/* イベントバインド */
+setTimeout(()=>{
+  $('#btnSaveProperty')?.addEventListener('click', ()=>{ saveCurrentProperty(); });
+  $('#btnGaiyou')?.addEventListener('click', ()=>{
+    const entry = saveCurrentProperty();
+    if(entry) openGaiyou(entry.id);
+  });
+  $('#btnNewProperty')?.addEventListener('click', ()=>{
+    STATE.currentPropertyId = '';
+    localStorage.removeItem(CURRENT_ID_KEY);
+    localStorage.removeItem('appraisal_snapshot_v1');
+    location.hash = '';
+    location.reload();
+  });
+}, 200);
+
+/* =========================================================
+ *  物件概要書（A4縦印刷対応）
+ * ========================================================= */
+function openGaiyou(id){
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===id);
+  if(!p){ showToast('物件が見つかりません','error'); return; }
+  $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
+  showView('gaiyou');
+}
+
+function buildGaiyouHTML(p){
+  const s = p.snapshot, b = s.basic||{}, e = s.expenses||{}, r = s.result||{}, m = s.market, a = s.areaInfo;
+  const addr = `${b.pref||''}${b.city||''}${b.addr||''}`;
+  const age = b.year ? (new Date().getFullYear()-b.year) : 0;
+  const today = new Date().toLocaleDateString('ja-JP');
+  const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
+  const fm = n => { const v = (Number(n)||0)/10000; return v >= 10000 ? (v/10000).toFixed(2)+'億円' : v.toFixed(0)+'万円'; };
+  const occupied = (s.rentRoll||[]).filter(x=>!x.vacancy).length;
+  const total = (s.rentRoll||[]).length;
+  const monthly = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
+  return `
+  <div class="gaiyou-sheet">
+    <div class="g-header">
+      <div class="g-corp">
+        <div class="g-corp-name">株式会社 住まっぷ</div>
+        <div class="g-corp-sub">SUMAPP REAL ESTATE</div>
+      </div>
+      <div class="g-title">物 件 概 要 書</div>
+      <div class="g-date">作成日：${today}</div>
+    </div>
+
+    <div class="g-title-box">${p.name||'—'}</div>
+    <div class="g-addr-box">所在地：${addr}　／　郵便番号 ${b.zip||'—'}</div>
+
+    <table class="g-table">
+      <tr><th>物件種別</th><td>一棟${b.units<=4?'アパート':'マンション'}</td><th>取引態様</th><td>—</td></tr>
+      <tr><th>代表構造</th><td>${b.struct||'—'}</td><th>築年（築年数）</th><td>${b.year?b.year+'年（築'+age+'年）':'—'}</td></tr>
+      <tr><th>総戸数</th><td>${b.units}戸</td><th>現況</th><td>${b.status||'—'}（${occupied}/${total}戸入居）</td></tr>
+      <tr><th>土地面積（合計）</th><td>${(b.land||0).toFixed(2)} ㎡（${((b.land||0)*0.3025).toFixed(2)}坪）</td><th>建物延床（合計）</th><td>${(b.floor||0).toFixed(2)} ㎡（${((b.floor||0)*0.3025).toFixed(2)}坪）</td></tr>
+      <tr><th>駐車場</th><td>${b.park||0}台 ／ ${fy(b.parkFee)}/台</td><th>満室想定 月額</th><td>${fy(monthly)}（年額 ${fy(monthly*12)}）</td></tr>
+    </table>
+
+    ${(b.lands||[]).length ? `
+    <div class="g-section-title">▼ 土地明細（${b.lands.length}筆）</div>
+    <table class="g-table">
+      <tr><th>地番</th><th>地目</th><th>面積（㎡）</th><th>備考</th></tr>
+      ${b.lands.map(l=>`<tr><td>${l.chiban||'—'}</td><td>${l.chimoku||'—'}</td><td class="r">${(l.area||0).toFixed(2)}</td><td>${l.note||''}</td></tr>`).join('')}
+      <tr class="g-total"><td colspan="2">合計</td><td class="r">${(b.land||0).toFixed(2)}</td><td></td></tr>
+    </table>` : ''}
+
+    ${(b.buildings||[]).length ? `
+    <div class="g-section-title">▼ 建物明細（${b.buildings.length}棟）</div>
+    <table class="g-table">
+      <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床（㎡）</th><th>備考</th></tr>
+      ${b.buildings.map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="r">${bb.year||'—'}</td><td class="r">${(bb.floor||0).toFixed(2)}</td><td>${bb.note||''}</td></tr>`).join('')}
+      <tr class="g-total"><td colspan="3">合計</td><td class="r">${(b.floor||0).toFixed(2)}</td><td>総戸数 ${b.units}戸</td></tr>
+    </table>` : ''}
+
+    ${a ? `
+    <div class="g-section-title">▼ 法規制・インフラ</div>
+    <table class="g-table">
+      <tr><th>用途地域</th><td>${a.youto_chiiki||'—'}</td><th>建ぺい/容積</th><td>${a.kenpei||'—'} / ${a.yoseki||'—'}</td></tr>
+      <tr><th>都市計画</th><td>${a.toshi_keikaku||'—'}</td><th>防火地域</th><td>${a.boukaku||'—'}</td></tr>
+      <tr><th>接道</th><td>${a.douro||'—'}</td><th>最寄駅</th><td>${a.transit||'—'}</td></tr>
+      <tr><th>ライフライン</th><td colspan="3">電気: ${a.lifeline?.denki||'—'} / ガス: ${a.lifeline?.gas||'—'} / 上水: ${a.lifeline?.suidou||'—'} / 下水: ${a.lifeline?.gesui||'—'}</td></tr>
+    </table>` : ''}
+
+    <div class="g-section-title">▼ 収益査定サマリー</div>
+    <table class="g-table">
+      <tr><th>査定価格 中央値</th><td class="g-price">${fm(r.priceMid||0)}</td><th>CAP RATE 中央値</th><td>${(r.capMid||0).toFixed(2)}%</td></tr>
+      <tr><th>上振れ値</th><td>${fm(r.priceUp||0)}（CAP ${(r.capMin||0).toFixed(2)}%）</td><th>下限値</th><td>${fm(r.priceLow||0)}（CAP ${(r.capMax||0).toFixed(2)}%）</td></tr>
+      <tr><th>満室想定 表面利回り</th><td>${(r.grossYield||0).toFixed(2)}%</td><th>NOI利回り</th><td>${(r.noiYield||0).toFixed(2)}%</td></tr>
+      <tr><th>GPI（満室想定年収）</th><td>${fy(r.GPI||0)}</td><th>NOI（純営業収益）</th><td>${fy(r.NOI||0)}</td></tr>
+    </table>
+
+    <div class="g-section-title">▼ 年間収支</div>
+    <table class="g-table">
+      <tr><th>GPI</th><td class="r">${fy(r.GPI||0)}</td><th>OPEX</th><td class="r">▲ ${fy(r.OPEX||0)}</td></tr>
+      <tr><th>空室損失</th><td class="r">▲ ${fy(r.vacancyLoss||0)}</td><th>NOI</th><td class="r g-price-mini">${fy(r.NOI||0)}</td></tr>
+    </table>
+
+    <div class="g-foot">
+      ※ 本概要書は記載時点の入力データに基づく参考資料です。実取引・契約にあたっては別途正式書類をご確認ください。<br>
+      株式会社 住まっぷ ／ 作成日 ${today}
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+ *  用語集データ
+ * ========================================================= */
+const GLOSSARY = [
+  { cat:'収支計算', term:'GPI', en:'Gross Potential Income', desc:'満室想定の年間総収入。全戸が満室で稼働した場合の家賃＋共益費＋駐車場収入の合計。' },
+  { cat:'収支計算', term:'空室損失', en:'Vacancy Loss', desc:'GPIに対して想定空室率を掛けた損失額。本アプリでは「想定空室率」または「AI推定空室率」で計算。' },
+  { cat:'収支計算', term:'EGI', en:'Effective Gross Income', desc:'実効総収入。GPI − 空室損失。実際に得られる年間収入のベース値。' },
+  { cat:'収支計算', term:'OPEX', en:'Operating Expenses', desc:'年間運営費用。管理委託費・修繕費・固定資産税・保険料・その他経費の合計。' },
+  { cat:'収支計算', term:'NOI', en:'Net Operating Income', desc:'純営業収益。EGI − OPEX。物件が生み出す実質的な利益。査定価格算出の核心指標。' },
+
+  { cat:'利回り指標', term:'表面利回り (グロス)', en:'Gross Yield', desc:'GPI ÷ 物件価格 × 100。経費を考慮しない最も簡易な指標。広告でよく使われる。' },
+  { cat:'利回り指標', term:'実質利回り (ネット)', en:'Net Yield / NOI利回り', desc:'NOI ÷ 物件価格 × 100。OPEXを差し引いた現実的な利回り。投資判断はこちらが重要。' },
+  { cat:'利回り指標', term:'現況利回り', en:'Current Yield', desc:'現状の入居者からの実際の家賃合計 ÷ 物件価格 × 100。空室を反映した実態値。' },
+  { cat:'利回り指標', term:'CAP RATE (還元利回り)', en:'Capitalization Rate', desc:'NOI ÷ 物件価格。エリア・築年・構造で相場が決まる。本アプリの査定価格 = NOI ÷ CAP RATE で算出。' },
+
+  { cat:'査定モデル', term:'収益還元法', en:'Income Approach', desc:'NOI ÷ CAP RATEで価格を逆算する方式。本アプリのModel A、賃貸不動産査定の主流。' },
+  { cat:'査定モデル', term:'相場価格モデル', en:'Comparable Approach', desc:'類似物件の㎡単価相場 × 対象物件の延床面積で参考価格を算出。本アプリのModel B。収益還元法の妥当性検証に使用。' },
+  { cat:'査定モデル', term:'DCF法', en:'Discounted Cash Flow', desc:'将来10年分のNOI＋10年後の売却価格を、割引率で現在価値に割り戻して合計。長期投資視点での妥当価格。' },
+  { cat:'査定モデル', term:'割引率', en:'Discount Rate', desc:'DCF計算で将来キャッシュフローを現在価値に変換する利率。長期金利＋リスクプレミアム。本アプリ初期値6.0%。' },
+
+  { cat:'投資判断', term:'投資回収年数', en:'Payback Period', desc:'物件価格 ÷ NOI。NOIで価格を回収するのに必要な年数。15年未満で良好、20年超は長期。' },
+  { cat:'投資判断', term:'CCR', en:'Cash on Cash Return', desc:'年間キャッシュフロー ÷ 自己資金 × 100。融資込みの自己資金回収効率。本アプリでは将来機能で対応予定。' },
+  { cat:'投資判断', term:'LTV', en:'Loan to Value', desc:'融資額 ÷ 物件価格 × 100。融資依存度。一般的に70〜90%で組成。' },
+
+  { cat:'経費項目', term:'管理委託費', en:'Property Management Fee', desc:'物件管理を委託する管理会社への手数料。本アプリ初期値5%（家賃収入比）。' },
+  { cat:'経費項目', term:'修繕積立金', en:'Repair Reserve', desc:'将来の大規模修繕に備えた月次積立。RC造は月20,000円〜、木造は月10,000円〜が目安。' },
+  { cat:'経費項目', term:'固定資産税', en:'Property Tax', desc:'土地・家屋にかかる地方税。年税額の目安：課税標準額×1.4%（固都税合算で1.7%程度）。' },
+  { cat:'経費項目', term:'都市計画税', en:'City Planning Tax', desc:'市街化区域内の物件にかかる地方税。課税標準額×0.3%。固定資産税と合算徴収。' },
+
+  { cat:'法規制', term:'用途地域', en:'Zoning', desc:'都市計画法で定められた土地利用区分。住居系・商業系・工業系の13種類。建物の用途・規模を規制。' },
+  { cat:'法規制', term:'建ぺい率', en:'Building Coverage Ratio', desc:'敷地面積に対する建築面積（1階の水平投影面積）の割合。30〜80%の範囲で用途地域ごとに指定。' },
+  { cat:'法規制', term:'容積率', en:'Floor Area Ratio', desc:'敷地面積に対する延床面積（全階合計）の割合。50〜1300%の範囲で用途地域ごとに指定。' },
+  { cat:'法規制', term:'防火地域', en:'Fire Prevention District', desc:'都市計画で指定される地域。耐火建築物の義務。準防火地域は規制が緩い。' },
+  { cat:'法規制', term:'高度地区', en:'Height Restriction District', desc:'建物の高さの最低限度・最高限度を定めた地区。第1〜第3種等の区分。' },
+  { cat:'法規制', term:'接道義務', en:'Setback Requirement', desc:'建築基準法で、敷地は幅員4m以上の道路に2m以上接する必要。再建築可否の最重要要件。' },
+  { cat:'法規制', term:'セットバック', en:'Setback', desc:'幅員4m未満の道路（2項道路）に接する敷地で、道路中心から2m後退して建築する義務。' },
+
+  { cat:'物件区分', term:'区分所有', en:'Sectional Ownership', desc:'マンション1室など、建物の一部を所有する形態。管理組合があり、共用部修繕は管理費で対応。' },
+  { cat:'物件区分', term:'一棟所有', en:'Whole Building Ownership', desc:'アパート・マンション1棟全体を所有。修繕計画・空室対策を自由に決定可能。本アプリの主要対象。' },
+  { cat:'物件区分', term:'構造区分', en:'Structure Type', desc:'RC（鉄筋コンクリート 法定耐用47年）/ SRC（鉄骨鉄筋コンクリート 47年）/ 重量鉄骨 34年 / 軽量鉄骨 19〜27年 / 木造 22年。' },
+
+  { cat:'評価関連', term:'評価額', en:'Assessed Value', desc:'固定資産税課税のために自治体が評価した価格。実勢価格の60〜70%程度。' },
+  { cat:'評価関連', term:'課税標準額', en:'Tax Base Amount', desc:'固定資産税計算のベース額。住宅用地の特例などで評価額より低くなることが多い。' },
+  { cat:'評価関連', term:'路線価', en:'Roadside Land Price', desc:'相続税・贈与税の評価基準価格。国税庁が毎年公表。実勢価格の80%程度。' },
+  { cat:'評価関連', term:'地価公示', en:'Published Land Price', desc:'国交省が毎年公表する標準地の地価。土地取引の指標。' },
+];
+
+function renderGlossary(){
+  const cats = [...new Set(GLOSSARY.map(g=>g.cat))];
+  const html = cats.map(cat=>{
+    const items = GLOSSARY.filter(g=>g.cat===cat);
+    return `
+      <div style="margin-bottom:20px">
+        <h3 style="font-size:13px;color:var(--blue);letter-spacing:.1em;border-left:3px solid var(--blue);padding-left:10px;margin-bottom:10px">▼ ${cat}</h3>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px">
+          ${items.map(g=>`
+            <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border)">
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+                <span style="font-weight:800;color:var(--text);font-size:14px">${g.term}</span>
+                <span style="font-size:11px;color:var(--sub);font-family:Inter">${g.en}</span>
+              </div>
+              <div style="font-size:12px;color:var(--text);line-height:1.7;opacity:0.85">${g.desc}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+  $('#glossaryBody').innerHTML = html;
+}
+
+$('#openGlossary').onclick = ()=>{
+  if(!$('#glossaryBody').innerHTML) renderGlossary();
+  $('#glossaryModal').classList.remove('hide');
+};
+$('#closeGlossary').onclick = ()=>$('#glossaryModal').classList.add('hide');
+$('#glossaryModal').onclick = (e)=>{ if(e.target.id==='glossaryModal') $('#glossaryModal').classList.add('hide'); };
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !$('#glossaryModal').classList.contains('hide')) $('#glossaryModal').classList.add('hide'); });
+
+/* =========================================================
+ *  自動保存・復元（localStorage）
+ * ========================================================= */
+const SNAPSHOT_KEY = 'appraisal_snapshot_v1';
+
+function saveSnapshot(){
+  try{
+    collectAll();
+    const snap = {
+      basic: STATE.basic,
+      expenses: STATE.expenses,
+      rentRoll: STATE.rentRoll,
+      market: STATE.market,
+      areaInfo: STATE.areaInfo,
+      rrCitations: STATE.rrCitations || [],
+      evalComment: $('#evalComment')?.value || '',
+      driveFolderUrl: $('#driveFolderUrl')?.value || '',
+      step: STATE.step,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+  }catch(e){ console.warn('saveSnapshot失敗', e); }
+}
+
+let _saveTimer;
+function autoSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveSnapshot, 600);
+}
+// すべての入力で自動保存
+document.addEventListener('input', autoSave);
+document.addEventListener('change', autoSave);
+
+function loadSnapshot(){
+  try{
+    const s = localStorage.getItem(SNAPSHOT_KEY);
+    if(!s) return;
+    const snap = JSON.parse(s);
+
+    // 基本情報
+    if(snap.basic){
+      const b = snap.basic;
+      if(b.name) $('#propName').value = b.name;
+      if(b.zip) $('#propZip').value = b.zip;
+      if(b.pref) $('#propPref').value = b.pref;
+      if(b.city) $('#propCity').value = b.city;
+      if(b.addr) $('#propAddr').value = b.addr;
+
+      if(Array.isArray(b.lands) && b.lands.length){
+        $('#landBody').innerHTML = '';
+        b.lands.forEach(l=>landAddRow(l));
+      }
+      if(Array.isArray(b.buildings) && b.buildings.length){
+        $('#bldgBody').innerHTML = '';
+        b.buildings.forEach(bb=>bldgAddRow(bb));
+      }
+      if($('#propStatus') && b.status) $('#propStatus').value = b.status;
+      if($('#propPark') && b.park) $('#propPark').value = b.park;
+      if($('#propParkFee') && b.parkFee) $('#propParkFee').value = Number(b.parkFee).toLocaleString('ja-JP');
+    }
+
+    // レントロール（復元時もサニタイズ：古い長文note・無効URLを救済）
+    if(Array.isArray(snap.rentRoll) && snap.rentRoll.length){
+      $('#rrBody').innerHTML = '';
+      snap.rentRoll.forEach(r=>{
+        const urlInNote = (r.note||'').match(/https?:\/\/[^\s)］、,]+/);
+        const url = urlInNote ? urlInNote[0] : '';
+        // 信頼ポータルのURLのみ採用、それ以外は廃棄
+        r._url = (url && typeof isTrustedPortal === 'function' && isTrustedPortal(url)) ? url : '';
+        // noteは強制サニタイズ（出典:サイト名のみに圧縮、20字超は切り捨て）
+        if(typeof sanitizeNote === 'function') r.note = sanitizeNote(r.note);
+        rrAddRow(r);
+      });
+    }
+
+    // 経費
+    if(snap.expenses){
+      const e = snap.expenses;
+      if(e.mgmtRate!==undefined && e.mgmtRate!==null) $('#opMgmt').value = e.mgmtRate;
+      if(e.repair) $('#opRepair').value = Number(e.repair).toLocaleString('ja-JP');
+      if(e.tax) $('#opTax').value = Number(e.tax).toLocaleString('ja-JP');
+      if(e.ins) $('#opIns').value = Number(e.ins).toLocaleString('ja-JP');
+      if(e.etc) $('#opEtc').value = Number(e.etc).toLocaleString('ja-JP');
+      if(e.vacancy!==undefined && e.vacancy!==null) $('#opVacancy').value = e.vacancy;
+      if(e.capMid) $('#capMid').value = e.capMid;
+      if(e.capMin) $('#capMin').value = e.capMin;
+      if(e.capMax) $('#capMax').value = e.capMax;
+      if(e.dcfRate) $('#dcfRate').value = e.dcfRate;
+      if(e.rentDrop) $('#rentDrop').value = e.rentDrop;
+      if(e.evalName) $('#evalName').value = e.evalName;
+    }
+
+    // AI結果類
+    if(snap.market) STATE.market = snap.market;
+    if(snap.areaInfo) STATE.areaInfo = snap.areaInfo;
+    if(snap.rrCitations) STATE.rrCitations = snap.rrCitations;
+    if(snap.evalComment) $('#evalComment').value = snap.evalComment;
+    if(snap.driveFolderUrl) $('#driveFolderUrl').value = snap.driveFolderUrl;
+
+    // ステップ復元
+    if(snap.step && snap.step>=1 && snap.step<=5) goStep(snap.step);
+
+    // 復元通知
+    if(snap.savedAt){
+      const t = new Date(snap.savedAt).toLocaleString('ja-JP');
+      showToast(`💾 前回の入力内容を復元しました（${t}）`,'success');
+    }
+  }catch(err){
+    console.warn('復元失敗', err);
+  }
+}
+
+// 全データクリア
+$('#clearData').onclick = ()=>{
+  if(!confirm('入力した物件情報・レントロール・経費・AI調査結果をすべてクリアします。\nAPIキーは保持されます。\n\n本当にクリアしますか？')) return;
+  localStorage.removeItem(SNAPSHOT_KEY);
+  location.reload();
+};
+
+// ページ離脱直前にも保存
+window.addEventListener('beforeunload', saveSnapshot);
+
+// 初期行が作られた後で復元実行
+setTimeout(loadSnapshot, 100);
+
+$('#btnPdf').onclick = async ()=>{
+  collectAll();
+  STATE.result = calcAll();
+  if(!STATE.result.GPI){ showToast('レントロール未入力です','error'); return; }
+
+  showToast('PDFを生成中…');
+  const root = $('#reportRoot');
+  root.innerHTML = buildReportHTML();
+
+  // jsPDF
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const pages = root.querySelectorAll('.pdf-page');
+
+  for(let i=0;i<pages.length;i++){
+    const canvas = await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    const img = canvas.toDataURL('image/jpeg', 0.92);
+    if(i>0) pdf.addPage();
+    pdf.addImage(img, 'JPEG', 0, 0, 210, 297);
+  }
+
+  const fn = `査定報告書_${STATE.basic.name||'物件'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  pdf.save(fn);
+  root.innerHTML = '';
+  showToast('PDFを出力しました','success');
+};
+</script>
+</body>
+</html>
