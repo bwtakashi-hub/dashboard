@@ -3684,11 +3684,12 @@ function resetSimulatorForm(){
   ['mkStrength','mkRisk'].forEach(id=>{
     const el = $('#'+id); if(el) el.innerHTML = '';
   });
-  // localStorage（編集中スナップショットのみクリア）
+  // 編集中物件IDだけ消す（snapshotは新規空状態として保存→F5で空が復元される）
   localStorage.removeItem(CURRENT_ID_KEY);
-  localStorage.removeItem('appraisal_snapshot_v1');
   // STEP1へ
   goStep(1);
+  // 空状態を即保存（F5復元時も空のまま）
+  setTimeout(saveSnapshot, 50);
   showToast('🆕 新規モードで開始しました','success');
 }
 
@@ -3824,6 +3825,8 @@ function loadProperty(id){
   localStorage.setItem(CURRENT_ID_KEY, id);
   showView('simulator');
   goStep(1);
+  // 編集中状態として即保存（F5で復元可能に）
+  setTimeout(saveSnapshot, 100);
   showToast(`物件「${p.name}」を読み込みました`,'success');
 }
 
@@ -4350,10 +4353,13 @@ function saveSnapshot(){
       rentRoll: STATE.rentRoll,
       market: STATE.market,
       areaInfo: STATE.areaInfo,
+      futureAI: STATE.futureAI,
+      taxInfo: STATE.taxInfo,
       rrCitations: STATE.rrCitations || [],
       evalComment: $('#evalComment')?.value || '',
       driveFolderUrl: $('#driveFolderUrl')?.value || '',
       step: STATE.step,
+      currentPropertyId: STATE.currentPropertyId || '',
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
@@ -4363,7 +4369,7 @@ function saveSnapshot(){
 let _saveTimer;
 function autoSave(){
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(saveSnapshot, 600);
+  _saveTimer = setTimeout(saveSnapshot, 300); // 600→300ms に短縮
 }
 // すべての入力で自動保存
 document.addEventListener('input', autoSave);
@@ -4431,9 +4437,16 @@ function loadSnapshot(){
     // AI結果類
     if(snap.market) STATE.market = snap.market;
     if(snap.areaInfo) STATE.areaInfo = snap.areaInfo;
+    if(snap.futureAI) STATE.futureAI = snap.futureAI;
+    if(snap.taxInfo) STATE.taxInfo = snap.taxInfo;
     if(snap.rrCitations) STATE.rrCitations = snap.rrCitations;
     if(snap.evalComment) $('#evalComment').value = snap.evalComment;
     if(snap.driveFolderUrl) $('#driveFolderUrl').value = snap.driveFolderUrl;
+    // 編集中の物件ID復元
+    if(snap.currentPropertyId){
+      STATE.currentPropertyId = snap.currentPropertyId;
+      localStorage.setItem(CURRENT_ID_KEY, snap.currentPropertyId);
+    }
 
     // ステップ復元
     if(snap.step && snap.step>=1 && snap.step<=5) goStep(snap.step);
