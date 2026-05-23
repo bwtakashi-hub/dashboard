@@ -1697,9 +1697,22 @@ async function fetchReinfoZoning(lat, lon){
   let res;
   if(/^https?:\/\//.test(STATE.reinfoKey)){
     // GASプロキシURL経由（URL内に ?key=... を含む形式）
-    const sep = STATE.reinfoKey.includes('?') ? '&' : '?';
-    const proxyUrl = STATE.reinfoKey + `${sep}api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
-    res = await fetch(proxyUrl, { redirect: 'follow', mode: 'cors' });
+    // 特殊文字を正しくURLエンコードするためURL/SearchParamsを使う
+    try{
+      const u = new URL(STATE.reinfoKey);
+      const rawKey = u.searchParams.get('key') || '';
+      u.searchParams.set('api', 'XKT002');
+      u.searchParams.set('lat', String(lat));
+      u.searchParams.set('lon', String(lon));
+      u.searchParams.set('zoom', String(zoom));
+      if(rawKey) u.searchParams.set('key', rawKey.trim());
+      res = await fetch(u.toString(), { redirect: 'follow', mode: 'cors' });
+    }catch(e){
+      // フォールバック（旧方式）
+      const sep = STATE.reinfoKey.includes('?') ? '&' : '?';
+      const proxyUrl = STATE.reinfoKey + `${sep}api=XKT002&lat=${lat}&lon=${lon}&zoom=${zoom}`;
+      res = await fetch(proxyUrl, { redirect: 'follow', mode: 'cors' });
+    }
   } else {
     // 直接呼び出し（CORS失敗の可能性大）
     const url = `https://www.reinfolib.mlit.go.jp/ex-api/external/XKT002?response_format=geojson&z=${t.z}&x=${t.x}&y=${t.y}`;
@@ -1715,7 +1728,15 @@ async function fetchReinfoZoning(lat, lon){
     throw new Error('GASプロキシが「全員アクセス可」になっていません。デプロイ管理から「アクセスできるユーザー: 全員」に変更してください。');
   }
   const geo = await res.json();
-  if(geo.error) throw new Error('プロキシエラー: '+geo.error);
+  if(geo.error){
+    // MLIT APIエラーをユーザー向けに翻訳
+    const msg = geo.error;
+    if(/401/.test(msg)) throw new Error('APIキー認証失敗（401）→ ①承認メール記載のキーか確認 ②キー前後の空白除去 ③申請ページで承認状態確認');
+    if(/403/.test(msg)) throw new Error('アクセス拒否（403）→ APIキーの利用制限を超過した可能性。時間を空けて再試行');
+    if(/429/.test(msg)) throw new Error('リクエスト過多（429）→ 連続実行を避けてください');
+    if(/404/.test(msg)) throw new Error('該当エリアにデータなし（404）→ 都市計画区域外の可能性');
+    throw new Error('プロキシエラー: '+msg);
+  }
   // 該当ポイントを含むポリゴンを探索（簡易：最初の feature を採用）
   if(!geo.features || !geo.features.length) return null;
   // point-in-polygon判定（簡易・Ray casting）
