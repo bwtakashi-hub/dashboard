@@ -3700,18 +3700,8 @@ document.addEventListener('click', e=>{
   const a = e.target.closest('[data-view]');
   if(!a) return;
   e.preventDefault();
-  // ナビメニュー or トップ画面のカードからシミュレーターをクリック → 入力データをリセット
-  // （物件一覧の「編集」ボタンは loadProperty() で別経路のため対象外）
-  const fromNav = a.classList.contains('nav-link') || a.classList.contains('nav-card');
-  if(a.dataset.view === 'simulator' && fromNav){
-    if(confirm('シミュレーターを新規モードで開きます。現在の入力中データはクリアされます。\n\n（登録済みの物件・APIキーは保持されます）\n\n続行しますか？')){
-      showView('simulator');
-      resetSimulatorForm();
-      return;
-    } else {
-      return;
-    }
-  }
+  // ナビ/カードクリックは編集中データを保持したまま画面遷移
+  // 新規開始したい場合は「物件登録一覧 → ＋ 新規物件作成」ボタンを使用
   showView(a.dataset.view);
 });
 
@@ -4045,6 +4035,7 @@ async function updateStationByAI(){
 - ライフラインは事業者名・種別を具体的に記載
 
 {
+  "zip": "郵便番号（ハイフン付き 例: 152-0034）",
   "transit": "最寄駅情報（路線名+駅名+徒歩分、複数駅可、必ず確定値）",
   "denki": "電気事業者名（例: 東京電力）",
   "gas": "ガス種別と事業者（例: 都市ガス 東京ガス、プロパンガス）",
@@ -4053,8 +4044,13 @@ async function updateStationByAI(){
   "shisetsu": "周辺施設・住環境を150字以内で具体的に。スーパー名（成城石井/東急ストア等）・コンビニ・商業施設・駅前環境・住宅街の特徴等を含める"
 }
 
+【徒歩分の計算根拠】
+- 直線距離（メートル）÷ 80 = 徒歩分（1分=80m基準、不動産公正取引協議会の定義）
+- ただしAI推定は地図情報のみ。実際の道のり・信号・坂道で +20〜30% かかる場合あり
+
 【例】
 {
+  "zip": "152-0034",
   "transit": "JR山手線『目黒』駅 徒歩7分／東急目黒線『目黒』駅 徒歩8分／南北線『目黒』駅 徒歩8分",
   "denki": "東京電力",
   "gas": "都市ガス 東京ガス",
@@ -4074,6 +4070,7 @@ async function updateStationByAI(){
       return Math.round((Number(a)+Number(b))/2)+'分';
     });
     ov.transit = transit.trim();
+    if(data.zip) ov.zip = data.zip;
     if(data.denki) ov.denki = data.denki;
     if(data.gas) ov.gas = data.gas;
     if(data.suidou) ov.suidou = data.suidou;
@@ -4176,8 +4173,9 @@ function buildGaiyouHTML(p){
 
     <div class="g-title-box">${ed('name', ov.name ?? p.name)}</div>
     <div class="g-addr-box">
-      <div><b>所在地：</b>${ed('addr', addr)}　／　〒${ed('zip', ov.zip ?? b.zip ?? '')}</div>
+      <div><b>〒</b>${ed('zip', ov.zip ?? b.zip ?? '—')}　<b>所在地：</b>${ed('addr', addr)}</div>
       <div style="margin-top:3px"><b>最寄駅：</b>${ed('transit', ov.transit ?? transitText)}</div>
+      <div style="margin-top:1px;font-size:7pt;color:#94a3b8">※徒歩分はAI推定（直線距離80m=1分）。実際の道のりで±20-30%の誤差あり。正確な所要時間は現地確認推奨。</div>
     </div>
 
     <div class="g-section-title">▼ 物件基本情報</div>
