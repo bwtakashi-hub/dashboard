@@ -48,6 +48,7 @@
   /* ===== Layout ===== */
   .wrap{max-width:1600px;margin:0 auto;padding:24px}
   @media (min-width:1920px){ .wrap{max-width:1800px} }
+  @media (min-width:2400px){ .wrap{max-width:2200px} html{font-size:18px} }
   header.topbar{
     display:flex;align-items:center;justify-content:space-between;
     padding:14px 18px;border-radius:18px;
@@ -58,17 +59,17 @@
   }
   .logo{display:flex;align-items:center;gap:12px}
   .logo .badge{
-    width:42px;height:42px;border-radius:12px;
+    width:52px;height:52px;border-radius:14px;
     background:linear-gradient(135deg,var(--blue),var(--purple));
-    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px;
     box-shadow:0 6px 24px rgba(14,165,233,0.35);
     font-family:Inter;
   }
-  .logo .title{font-size:18px;font-weight:800;letter-spacing:.04em}
-  .logo .subtitle{font-size:11px;color:var(--sub);letter-spacing:.2em}
+  .logo .title{font-size:22px;font-weight:800;letter-spacing:.04em}
+  .logo .subtitle{font-size:12px;color:var(--sub);letter-spacing:.2em}
 
-  .topnav{display:flex;gap:4px;align-items:center}
-  .nav-link{display:inline-block;padding:10px 18px;border-radius:10px;color:var(--sub);text-decoration:none;font-size:14px;font-weight:700;cursor:pointer;transition:.2s;letter-spacing:.04em}
+  .topnav{display:flex;gap:6px;align-items:center}
+  .nav-link{display:inline-block;padding:12px 22px;border-radius:12px;color:var(--sub);text-decoration:none;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;letter-spacing:.05em}
   .nav-link:hover{background:rgba(255,255,255,0.06);color:var(--text)}
   .nav-link.active{background:linear-gradient(135deg,rgba(14,165,233,0.25),rgba(139,92,246,0.25));color:#fff;border:1px solid rgba(14,165,233,0.4)}
   .view{animation:fadeIn .3s ease}
@@ -345,23 +346,23 @@
 
   <!-- ===== HOME VIEW ===== -->
   <section class="view view-home">
-    <div class="card" style="text-align:center;padding:80px 40px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(139,92,246,0.08))">
-      <div style="font-size:72px;margin-bottom:12px;line-height:1">🏢</div>
-      <h2 style="font-size:42px;margin-bottom:12px;letter-spacing:.05em">株式会社 住まっぷ</h2>
-      <div style="color:var(--sub);font-size:18px;margin-bottom:56px;letter-spacing:.08em">収益物件 AI 査定シミュレーター</div>
-      <div class="grid grid-2" style="max-width:1100px;margin:0 auto;gap:24px">
-        <a class="nav-card" data-view="simulator" style="text-decoration:none;padding:48px 28px">
-          <div style="font-size:56px;line-height:1;margin-bottom:8px">📊</div>
-          <div class="nav-card-title" style="font-size:22px">査定シミュレーター</div>
-          <div class="nav-card-desc" style="font-size:14px;line-height:1.8">物件情報・レントロール・経費を入力してAIで査定。<br>3パターン価格・将来予測・PDFレポート出力</div>
+    <div class="card" style="text-align:center;padding:100px 40px;background:linear-gradient(135deg,rgba(14,165,233,0.10),rgba(139,92,246,0.10))">
+      <div style="font-size:96px;margin-bottom:16px;line-height:1">🏢</div>
+      <h2 style="font-size:56px;margin-bottom:14px;letter-spacing:.06em;font-weight:900">株式会社 住まっぷ</h2>
+      <div style="color:var(--sub);font-size:22px;margin-bottom:64px;letter-spacing:.1em">収益物件 AI 査定シミュレーター</div>
+      <div class="grid grid-2" style="max-width:1300px;margin:0 auto;gap:32px">
+        <a class="nav-card" data-view="simulator" style="text-decoration:none;padding:64px 36px">
+          <div style="font-size:72px;line-height:1;margin-bottom:14px">📊</div>
+          <div class="nav-card-title" style="font-size:28px;margin-bottom:12px">査定シミュレーター</div>
+          <div class="nav-card-desc" style="font-size:16px;line-height:1.8">物件情報・レントロール・経費を入力してAIで査定。<br>3パターン価格・将来予測・PDFレポート出力</div>
         </a>
-        <a class="nav-card" data-view="list" style="text-decoration:none;padding:48px 28px">
-          <div style="font-size:56px;line-height:1;margin-bottom:8px">📋</div>
-          <div class="nav-card-title" style="font-size:22px">物件登録一覧</div>
-          <div class="nav-card-desc" style="font-size:14px;line-height:1.8">登録済みの物件を一覧表示。<br>編集・複製・物件概要書出力・削除</div>
+        <a class="nav-card" data-view="list" style="text-decoration:none;padding:64px 36px">
+          <div style="font-size:72px;line-height:1;margin-bottom:14px">📋</div>
+          <div class="nav-card-title" style="font-size:28px;margin-bottom:12px">物件登録一覧</div>
+          <div class="nav-card-desc" style="font-size:16px;line-height:1.8">登録済みの物件を一覧表示。<br>編集・複製・物件概要書出力・削除</div>
         </a>
       </div>
-      <div style="margin-top:48px;font-size:13px;color:var(--sub)">最終更新: <span id="homeStat">—</span></div>
+      <div style="margin-top:56px;font-size:14px;color:var(--sub)">最終更新: <span id="homeStat">—</span></div>
     </div>
   </section>
 
