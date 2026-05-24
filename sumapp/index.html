@@ -276,7 +276,8 @@
   .pdf-kpi .v{font-size:14px;font-weight:800;color:#0a1226;font-family:Inter;margin-top:2px}
 
   /* ===== 物件概要書 (A4縦・1ページ完全収納) ===== */
-  .gaiyou-sheet{width:210mm;height:297mm;background:#fff;color:#1a1a2e;padding:10mm 10mm 22mm 10mm;font-family:"Noto Sans JP",sans-serif;font-size:8pt;line-height:1.3;margin:0 auto;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .gaiyou-sheet{width:210mm;height:297mm;background:#fff;color:#1a1a2e;padding:8mm 8mm 16mm 8mm;font-family:"Noto Sans JP",sans-serif;font-size:8pt;line-height:1.3;margin:0 auto;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .g-frame{flex:1;display:flex;flex-direction:column;border:2.5px solid #0a1226;padding:5mm 6mm;background:#fff;overflow:hidden}
   .g-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #0a1226;padding-bottom:3px;margin-bottom:4px;flex-shrink:0}
   .g-corp-name{font-size:11pt;font-weight:900;color:#0a1226;letter-spacing:.05em}
   .g-corp-sub{font-size:7pt;color:#64748b;letter-spacing:.15em}
@@ -292,7 +293,7 @@
   .g-table .g-price{font-size:13pt;font-weight:900;color:#0ea5e9;letter-spacing:.02em}
   .g-table .g-price-mini{font-weight:900;color:#10b981}
   .g-table tr.g-total td{background:#dbeafe;font-weight:800;color:#0a1226;border-top:2.5px solid #0ea5e9}
-  .g-foot{position:absolute;bottom:6mm;left:10mm;right:10mm;padding-top:4px;border-top:1px solid #cbd5e1;font-size:7pt;color:#64748b;line-height:1.5;text-align:center}
+  .g-foot{position:absolute;bottom:4mm;left:8mm;right:8mm;font-size:7pt;color:#64748b;line-height:1.5;text-align:center;border-top:none;padding-top:0}
   .g-memo-table{display:table;width:100%}
   .g-memo-cell{vertical-align:top !important}
   .g-edit{display:inline-block;min-width:30px;padding:1px 4px;border-radius:3px;cursor:text;transition:background .15s;outline:none}
@@ -4302,6 +4303,7 @@ function buildGaiyouHTML(p){
 
   return `
   <div class="gaiyou-sheet" data-prop-id="${p.id}">
+    <div class="g-frame">
     <div class="g-header">
       <div class="g-corp">
         <div class="g-corp-name">株式会社 住まっぷ</div>
@@ -4418,8 +4420,9 @@ function buildGaiyouHTML(p){
 
     <div class="g-section-title" style="flex-shrink:0">▼ 備考</div>
     <table class="g-table g-memo-table" style="flex:1 1 auto">
-      <tr style="height:100%"><td colspan="4" class="g-memo-cell" style="vertical-align:top;line-height:1.5;white-space:pre-wrap;font-size:8pt;min-height:60mm;height:60mm">${ed('memo', ov.memo ?? '')}</td></tr>
+      <tr style="height:100%"><td colspan="4" class="g-memo-cell" style="vertical-align:top;line-height:1.5;white-space:pre-wrap;font-size:8pt;min-height:50mm">${ed('memo', ov.memo ?? '')}</td></tr>
     </table>
+    </div><!-- /g-frame -->
 
     <div class="g-foot">
       ※ 本概要書は記載時点の入力データに基づく参考資料です。実取引・契約にあたっては別途正式書類をご確認ください。<br>
