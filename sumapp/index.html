@@ -33,7 +33,9 @@
     --mute:#475569;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Noto Sans JP","Inter",sans-serif;-webkit-font-smoothing:antialiased;font-size:16px}
+  html{zoom:1.15}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Noto Sans JP","Inter",sans-serif;-webkit-font-smoothing:antialiased;font-size:17px}
+  @media print{ html{zoom:1 !important} }
   body{
     min-height:100vh;
     background:
@@ -109,8 +111,8 @@
   .step.active{background:linear-gradient(135deg,rgba(14,165,233,0.18),rgba(139,92,246,0.18));border-color:var(--blue)}
   .step.active .num{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
   .step.done .num{background:var(--green);color:#fff}
-  .step .lbl{font-size:15px;font-weight:700;line-height:1.3}
-  .step .sublbl{font-size:11px;color:var(--sub);letter-spacing:.1em}
+  .step .lbl{font-size:16px;font-weight:700;line-height:1.3}
+  .step .sublbl{font-size:12px;color:var(--sub);letter-spacing:.1em}
   .step-arrow{color:var(--mute);font-size:18px}
 
   /* ===== Cards / Forms ===== */
@@ -120,18 +122,18 @@
     animation:fadeIn .4s ease;
   }
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .card h2{font-size:22px;margin-bottom:8px}
-  .card .desc{color:var(--sub);font-size:14px;margin-bottom:18px}
+  .card h2{font-size:24px;margin-bottom:8px}
+  .card .desc{color:var(--sub);font-size:15px;margin-bottom:18px}
   .grid{display:grid;gap:14px}
   .grid-2{grid-template-columns:repeat(2,1fr)}
   .grid-3{grid-template-columns:repeat(3,1fr)}
   .grid-4{grid-template-columns:repeat(4,1fr)}
   @media (max-width:900px){.grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}}
 
-  label{display:block;font-size:13px;color:var(--sub);letter-spacing:.08em;margin-bottom:6px;font-weight:600}
+  label{display:block;font-size:14px;color:var(--sub);letter-spacing:.08em;margin-bottom:6px;font-weight:600}
   input.fld,select.fld,textarea.fld{
     width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--card-border);
-    background:rgba(0,0,0,0.3);color:var(--text);font-family:inherit;font-size:15px;transition:.2s;
+    background:rgba(0,0,0,0.3);color:var(--text);font-family:inherit;font-size:16px;transition:.2s;
   }
   input.fld:focus,select.fld:focus,textarea.fld:focus{
     outline:none;border-color:var(--blue);background:rgba(0,0,0,0.45);
@@ -142,7 +144,7 @@
 
   /* Buttons */
   .btn{
-    padding:12px 22px;border-radius:12px;border:none;font-family:inherit;font-weight:700;font-size:15px;
+    padding:12px 22px;border-radius:12px;border:none;font-family:inherit;font-weight:700;font-size:16px;
     cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:8px;
   }
   .btn-primary{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;box-shadow:0 6px 20px rgba(14,165,233,0.35)}
@@ -166,10 +168,10 @@
   .file-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(14,165,233,0.12);color:var(--blue);font-size:12px;margin:4px}
 
   /* ===== Table ===== */
-  table.rr{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
+  table.rr{width:100%;border-collapse:separate;border-spacing:0;font-size:16px}
   table.rr th,table.rr td{padding:10px 8px;border-bottom:1px solid var(--card-border)}
-  table.rr th{font-size:12px;color:var(--sub);letter-spacing:.1em;text-align:left;font-weight:700;background:rgba(255,255,255,0.04)}
-  table.rr td input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;font-size:14px}
+  table.rr th{font-size:13px;color:var(--sub);letter-spacing:.1em;text-align:left;font-weight:700;background:rgba(255,255,255,0.04)}
+  table.rr td input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;font-size:15px}
   table.rr td input:focus{outline:none;border-color:var(--blue);background:rgba(0,0,0,0.4)}
   table.rr td.right input{text-align:right}
   .row-add{padding:10px;text-align:center;color:var(--blue);cursor:pointer;border-radius:10px;background:rgba(14,165,233,0.06);border:1px dashed rgba(14,165,233,0.3);margin-top:8px}
@@ -194,9 +196,9 @@
   .price-card.low .price{color:var(--orange)}
 
   .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
-  .kpi .k{padding:16px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)}
-  .kpi .k .lbl{font-size:12px;color:var(--sub);letter-spacing:.12em;margin-bottom:6px;font-weight:600}
-  .kpi .k .val{font-size:22px;font-weight:800;font-family:Inter}
+  .kpi .k{padding:18px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--card-border)}
+  .kpi .k .lbl{font-size:13px;color:var(--sub);letter-spacing:.12em;margin-bottom:6px;font-weight:600}
+  .kpi .k .val{font-size:24px;font-weight:800;font-family:Inter}
   .kpi .k.blue .val{color:var(--blue)}
   .kpi .k.green .val{color:var(--green)}
   .kpi .k.orange .val{color:var(--orange)}
