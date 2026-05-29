@@ -3874,6 +3874,7 @@ function buildSnapshot(){
     areaInfo: STATE.areaInfo,
     futureAI: STATE.futureAI,
     taxInfo: STATE.taxInfo,
+    landDeals: STATE.landDeals || null,
     rrCitations: STATE.rrCitations || [],
     evalComment: $('#evalComment')?.value || '',
     result: STATE.result,
@@ -4490,6 +4491,39 @@ function buildGaiyouHTML(p){
       <tr><td colspan="4" style="font-size:9pt;line-height:1.6">${ed('kisei', ov.kisei ?? ((a.kisei && a.kisei.length)? a.kisei.map(k=>'・'+k).join('　') : '（STEP1の「🤖 AI推定（補完情報）」を実行してください）'))}<br><span style="font-size:8pt;color:#64748b">※ AI推定値。正確な情報は自治体HP（都市計画課・建築指導課）でご確認ください</span></td></tr>
     </table>
 
+    ${isLand ? (()=>{
+      // 土地：3パターン価格セクション（編集可能）
+      const landTsubo = (b.land||0) * 0.3025;
+      const avgUnit = s.landDeals?.avgUnitPriceMan || 0;
+      const calcMid = (avgUnit>0 && landTsubo>0) ? Math.round(avgUnit * landTsubo * 10000) : 0;
+      const lpMid = ov.landPriceMid !== undefined ? Number(ov.landPriceMid)||0 : calcMid;
+      const lpUp  = ov.landPriceUp !== undefined ? Number(ov.landPriceUp)||0 : Math.round(lpMid*1.10);
+      const lpLow = ov.landPriceLow !== undefined ? Number(ov.landPriceLow)||0 : Math.round(lpMid*0.90);
+      const unitMid = (lpMid>0 && landTsubo>0) ? (lpMid/landTsubo/10000) : avgUnit;
+      return `
+    <div class="g-section-title">▼ 査定価格（土地・3パターン／編集可）</div>
+    <table class="g-table">
+      <tr>
+        <th style="width:18%">上振れ値（強気）</th>
+        <td style="text-align:center;font-size:11pt;font-weight:900;color:#10b981"><span class="g-edit" data-key="landPriceUp" data-type="money" contenteditable="true" spellcheck="false">${lpUp>0?fy(lpUp):'—'}</span></td>
+        <th style="width:18%">中央値（査定）</th>
+        <td style="text-align:center;font-size:13pt;font-weight:900;color:#0ea5e9"><span class="g-edit" data-key="landPriceMid" data-type="money" contenteditable="true" spellcheck="false">${lpMid>0?fy(lpMid):'—'}</span></td>
+      </tr>
+      <tr>
+        <th>下限値（保守）</th>
+        <td style="text-align:center;font-size:11pt;font-weight:900;color:#f59e0b"><span class="g-edit" data-key="landPriceLow" data-type="money" contenteditable="true" spellcheck="false">${lpLow>0?fy(lpLow):'—'}</span></td>
+        <th>坪単価（中央値）</th>
+        <td style="text-align:center;font-weight:800">${unitMid>0?unitMid.toFixed(1)+' 万円/坪':'—'}</td>
+      </tr>
+      <tr>
+        <th>土地面積（坪）</th>
+        <td>${landTsubo.toFixed(2)} 坪（${(b.land||0).toFixed(2)} ㎡）</td>
+        <th>周辺事例 平均坪単価</th>
+        <td>${avgUnit>0?avgUnit.toFixed(1)+' 万円/坪':'—（STEP2「🤖 取引事例を調査」で取得）'}</td>
+      </tr>
+    </table>
+    `;
+    })() : `
     <div class="g-section-title">▼ 販売価格・収益サマリー</div>
     <table class="g-table">
       <tr>
@@ -4511,7 +4545,7 @@ function buildGaiyouHTML(p){
         <th>自己資金回収 / 地代</th>
         <td class="r">${r.ownPayback>0?r.ownPayback.toFixed(1)+'年':'—'} / ${r.leaseRentY>0?fy(r.leaseRentY)+'(年)':'—'}</td>
       </tr>` : ''}
-    </table>
+    </table>`}
 
     <div class="g-section-title">▼ 周辺環境（AI推定）</div>
     <table class="g-table">
@@ -4947,6 +4981,7 @@ function loadSnapshot(){
     if(snap.areaInfo) STATE.areaInfo = snap.areaInfo;
     if(snap.futureAI) STATE.futureAI = snap.futureAI;
     if(snap.taxInfo) STATE.taxInfo = snap.taxInfo;
+    if(snap.landDeals) STATE.landDeals = snap.landDeals;
     if(snap.rrCitations) STATE.rrCitations = snap.rrCitations;
     if(snap.evalComment) $('#evalComment').value = snap.evalComment;
     if(snap.driveFolderUrl) $('#driveFolderUrl').value = snap.driveFolderUrl;
