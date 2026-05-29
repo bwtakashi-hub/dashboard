@@ -794,6 +794,22 @@
     <h2>STEP 5 — 査定結果・レポート</h2>
     <p class="desc">2モデル（収益還元法 + 相場価格）による査定結果です。A4 PDFレポート出力も可能です。</p>
 
+    <!-- 土地用：3パターン価格（土地時のみ表示） -->
+    <div id="step5LandSection" style="display:none">
+      <h3 style="font-size:14px;color:var(--green);letter-spacing:.1em;margin:8px 0 4px">▼ 土地査定価格（3パターン／編集可）</h3>
+      <div class="price-row">
+        <div class="price-card up"><div class="label">上振れ値（強気）</div><div class="price" id="rsLandUp" contenteditable="true" spellcheck="false">—</div><div class="yld" id="rsLandUpUnit">— 万円/坪</div></div>
+        <div class="price-card mid"><div class="label">中央値（査定）</div><div class="price" id="rsLandMid" contenteditable="true" spellcheck="false">—</div><div class="yld" id="rsLandMidUnit">— 万円/坪</div></div>
+        <div class="price-card low"><div class="label">下限値（保守）</div><div class="price" id="rsLandLow" contenteditable="true" spellcheck="false">—</div><div class="yld" id="rsLandLowUnit">— 万円/坪</div></div>
+      </div>
+      <div style="padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;margin-bottom:14px">
+        <div>📊 <b>周辺事例 平均坪単価：</b> <span id="rsLandAvg">— 万円/坪</span>　／　<b>土地坪数：</b> <span id="rsLandTsubo">— 坪</span></div>
+        <div style="font-size:10px;color:var(--sub);margin-top:4px">※ 中央値 = 周辺事例平均坪単価 × 土地坪数。上振れ +10% / 下限 -10%。直接編集して微調整可能</div>
+      </div>
+    </div>
+
+    <!-- 収益還元法（土地以外） -->
+    <div id="step5IncomeSection">
     <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:8px 0 4px">▼ MODEL A — 収益還元法 査定価格</h3>
     <div class="price-row">
       <div class="price-card up"><div class="label">上振れ値（強気）</div><div class="price" id="rsUp">¥0</div><div class="yld" id="rsUpY">CAP -% / 想定NOI -</div></div>
@@ -858,6 +874,7 @@
         <div class="chart-wrap"><canvas id="chartSqm"></canvas></div>
       </div>
     </div>
+    </div><!-- /step5IncomeSection -->
 
     <div style="margin-top:18px">
       <label>査定者コメント（PDFに反映）</label>
@@ -4061,6 +4078,45 @@ setTimeout(()=>{
   $('#btnFetchLandDeals')?.addEventListener('click', fetchLandDealsByAI);
 }, 200);
 
+/* STEP5 土地3パターン価格表示更新 */
+function updateLandStep5(){
+  collectAll();
+  const b = STATE.basic;
+  const landTsubo = (b.land||0) * 0.3025;
+  const avgUnit = STATE.landDeals?.avgUnitPriceMan || 0;
+  const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
+  const fm = n => { const v = (Number(n)||0)/10000; return v >= 10000 ? (v/10000).toFixed(2)+'億円' : v.toFixed(0)+'万円'; };
+  // 編集中値があれば優先、なければ計算値
+  const lm = STATE.landPriceMid !== undefined ? Number(STATE.landPriceMid) : (avgUnit*landTsubo*10000);
+  const lu = STATE.landPriceUp  !== undefined ? Number(STATE.landPriceUp)  : Math.round(lm*1.10);
+  const ll = STATE.landPriceLow !== undefined ? Number(STATE.landPriceLow) : Math.round(lm*0.90);
+  const unitOf = p => (p>0 && landTsubo>0) ? (p/landTsubo/10000).toFixed(1) : '—';
+  if($('#rsLandUp')) $('#rsLandUp').textContent = lu>0?fm(lu):'—';
+  if($('#rsLandMid')) $('#rsLandMid').textContent = lm>0?fm(lm):'—';
+  if($('#rsLandLow')) $('#rsLandLow').textContent = ll>0?fm(ll):'—';
+  if($('#rsLandUpUnit')) $('#rsLandUpUnit').textContent = unitOf(lu)+' 万円/坪';
+  if($('#rsLandMidUnit')) $('#rsLandMidUnit').textContent = unitOf(lm)+' 万円/坪';
+  if($('#rsLandLowUnit')) $('#rsLandLowUnit').textContent = unitOf(ll)+' 万円/坪';
+  if($('#rsLandAvg')) $('#rsLandAvg').textContent = avgUnit>0?avgUnit.toFixed(1)+' 万円/坪':'— (STEP2「取引事例を調査」で取得)';
+  if($('#rsLandTsubo')) $('#rsLandTsubo').textContent = landTsubo.toFixed(2)+' 坪';
+  // 編集セルにイベント
+  ['rsLandUp','rsLandMid','rsLandLow'].forEach(id=>{
+    const el = $('#'+id); if(!el || el._bound) return;
+    el._bound = true;
+    el.addEventListener('blur', ()=>{
+      const raw = el.textContent.replace(/[^\d]/g,'');
+      const v = raw ? Number(raw) : 0;
+      const key = id.replace('rsLand','landPrice');
+      STATE[key] = v;
+      el.textContent = v>0?fm(v):'—';
+      const tsubo = (STATE.basic?.land||0)*0.3025;
+      const unit = (v>0 && tsubo>0) ? (v/tsubo/10000).toFixed(1)+' 万円/坪' : '— 万円/坪';
+      const ue = $('#'+id+'Unit'); if(ue) ue.textContent = unit;
+      saveSnapshot();
+    });
+  });
+}
+
 /* AI推定で周辺土地取引事例を取得 */
 async function fetchLandDealsByAI(){
   collectAll();
@@ -4779,6 +4835,13 @@ function applyPropertyTypeView(){
   const landDealsSection = $('#landDealsSection');
   if(rentRollWrap) rentRollWrap.style.display = isLand ? 'none' : '';
   if(landDealsSection) landDealsSection.style.display = isLand ? 'block' : 'none';
+  // STEP5：土地は3パターンのみ、収益還元法/グラフは非表示
+  const incomeSection = $('#step5IncomeSection');
+  const landSection = $('#step5LandSection');
+  if(incomeSection) incomeSection.style.display = isLand ? 'none' : '';
+  if(landSection) landSection.style.display = isLand ? 'block' : 'none';
+  // 土地表示の中身更新
+  if(isLand) updateLandStep5();
   // 土地のみ：建物テーブル非表示
   const bldgSection = document.querySelector('#bldgTable');
   if(bldgSection){
