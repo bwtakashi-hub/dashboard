@@ -549,7 +549,20 @@
     <h2>STEP 2 — レントロール・現況</h2>
     <p class="desc">現況・駐車場・レントロールを入力してください。レントロールPDF/Excel/CSVをアップロードでAI自動入力も可能です。</p>
 
+    <!-- 土地用：周辺土地取引事例（土地時のみ表示） -->
+    <div id="landDealsSection" style="display:none;margin-bottom:18px;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(16,185,129,0.10),rgba(14,165,233,0.10));border:1px solid rgba(16,185,129,0.35)">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div>
+          <div style="font-weight:700;font-size:14px">🌳 周辺土地取引事例</div>
+          <div style="font-size:11px;color:var(--sub)">土地物件はレントロール不要。代わりに周辺の取引事例をAIで調査します</div>
+        </div>
+        <button class="btn btn-green" id="btnFetchLandDeals" style="padding:8px 14px;font-size:12px">🤖 取引事例を調査</button>
+      </div>
+      <div id="landDealsResult" style="margin-top:10px"></div>
+    </div>
+
     <!-- 現況・駐車場 -->
+    <div id="rentRollWrap">
     <h3 style="font-size:14px;color:var(--blue);letter-spacing:.1em;margin:8px 0 8px">▼ 現況・駐車場</h3>
     <div class="grid grid-3" style="margin-bottom:18px">
       <div>
@@ -612,6 +625,8 @@
       <div class="k green"><div class="lbl">満室想定 年額（GPI）</div><div class="val" id="rrFullYear">¥0</div></div>
       <div class="k orange"><div class="lbl">現況 月額（空室除く）</div><div class="val" id="rrCurMonth">¥0</div></div>
     </div>
+
+    </div><!-- /rentRollWrap -->
 
     <div class="actions">
       <button class="btn btn-ghost" data-go="1">← STEP 1 へ戻る</button>
@@ -4042,7 +4057,82 @@ setTimeout(()=>{
       resetSimulatorForm();
     }
   });
+  $('#btnFetchLandDeals')?.addEventListener('click', fetchLandDealsByAI);
 }, 200);
+
+/* AI推定で周辺土地取引事例を取得 */
+async function fetchLandDealsByAI(){
+  collectAll();
+  const b = STATE.basic;
+  const addr = `${b.pref||''}${b.city||''}${b.addr||''}`.trim();
+  if(!addr){ showToast('STEP1で所在地を入力してください','error'); return; }
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+
+  const out = $('#landDealsResult');
+  out.innerHTML = '<div style="color:var(--green);font-size:12px">🤖 AIが周辺土地取引事例を調査中…（過去事例＋現在募集）</div>';
+
+  try{
+    const prompt = `あなたは日本の不動産取引データ分析のエキスパートです。
+住所「${addr}」周辺の土地取引事例を、国交省 不動産情報ライブラリ（取引価格情報）と一般公開情報をもとに、直近3〜5件JSONで返してください。
+前置き・解説・コードブロック装飾は不要、JSONのみ。
+
+[
+  {
+    "address": "取引地の概略所在地（町名・丁目まで）",
+    "deal_period": "取引時期（例: 2024年第3四半期）",
+    "price": 取引価格円数値,
+    "area_m2": 土地面積㎡数値,
+    "unit_price_man": 坪単価（万円/坪）数値,
+    "use_area": "用途地域（例: 第一種中高層住居専用地域）",
+    "transport": "最寄駅（例: 目黒駅 徒歩7分）",
+    "note": "備考（例: 角地、整形地、私道負担あり等）"
+  }
+]
+
+【重要】
+- 推測でも構わないが、地域相場感に沿った妥当な値を返す
+- 価格は円単位、坪単価は万円単位
+- 不明項目は空文字 or 0`;
+    const text = await callClaude([{role:'user',content:prompt}], '', 3000);
+    const arr = extractJson(text);
+    if(!Array.isArray(arr) || !arr.length){
+      out.innerHTML = '<div style="color:var(--orange);font-size:12px">⚠ 取引事例が取得できませんでした</div>';
+      return;
+    }
+    const avgUnit = arr.reduce((s,d)=>s+(d.unit_price_man||0),0) / arr.length;
+    const rows = arr.map(d=>`
+      <tr>
+        <td>${d.address||'—'}</td>
+        <td style="font-size:11px">${d.deal_period||'—'}</td>
+        <td class="right" style="font-family:Inter">${d.price?Math.round(d.price/10000).toLocaleString()+'万円':'—'}</td>
+        <td class="right" style="font-family:Inter">${d.area_m2?d.area_m2.toFixed(2)+'㎡':'—'}</td>
+        <td class="right" style="font-family:Inter;color:var(--blue);font-weight:700">${d.unit_price_man?d.unit_price_man.toFixed(1)+'万/坪':'—'}</td>
+        <td style="font-size:11px">${d.use_area||'—'}</td>
+        <td style="font-size:11px">${d.transport||'—'}</td>
+        <td style="font-size:11px;color:var(--sub)">${d.note||''}</td>
+      </tr>
+    `).join('');
+    out.innerHTML = `
+      <div style="margin-bottom:8px;padding:8px 12px;border-radius:8px;background:rgba(16,185,129,0.08);font-size:12px">
+        ✅ <b>${arr.length}件の取引事例</b>を取得 ／ 平均坪単価 <b style="color:var(--green);font-size:14px">${avgUnit.toFixed(1)} 万円/坪</b>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rr" style="font-size:12px">
+          <thead><tr>
+            <th>所在地</th><th>取引時期</th><th style="text-align:right">価格</th><th style="text-align:right">面積</th><th style="text-align:right">坪単価</th><th>用途地域</th><th>最寄駅</th><th>備考</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--orange)">⚠ AI推定値。正確な情報は国交省 不動産情報ライブラリ・REINSでご確認ください</div>
+    `;
+    STATE.landDeals = { items: arr, avgUnitPriceMan: avgUnit, fetchedAt: new Date().toISOString() };
+    showToast(`✅ ${arr.length}件取得（平均 ${avgUnit.toFixed(1)}万円/坪）`,'success');
+  }catch(err){
+    out.innerHTML = `<div style="color:var(--red);font-size:12px;padding:8px;background:rgba(239,68,68,0.08);border-radius:6px">❌ ${err.message}</div>`;
+    showToast('取引事例取得失敗: '+err.message,'error');
+  }
+}
 
 /* ===== サンプル物件: アジュール目黒 ===== */
 function seedAzureMeguro(){
@@ -4650,6 +4740,11 @@ function applyPropertyTypeView(){
   const t = $('#propType')?.value || '一棟マンション/アパート';
   const isLand = t === '土地';
   const isCondo = t === '区分マンション';
+  // 土地：レントロール非表示・取引事例セクション表示
+  const rentRollWrap = $('#rentRollWrap');
+  const landDealsSection = $('#landDealsSection');
+  if(rentRollWrap) rentRollWrap.style.display = isLand ? 'none' : '';
+  if(landDealsSection) landDealsSection.style.display = isLand ? 'block' : 'none';
   // 土地のみ：建物テーブル非表示
   const bldgSection = document.querySelector('#bldgTable');
   if(bldgSection){
