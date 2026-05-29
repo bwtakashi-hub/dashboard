@@ -384,8 +384,13 @@
 
   <!-- ===== STEP 1 ===== -->
   <section class="card step-panel" data-panel="1">
-    <h2>STEP 1 — 物件基本情報</h2>
-    <p class="desc">物件の基本スペックを入力してください。謄本・公図・レントロールをアップロードするとAIが自動で読み取ります。</p>
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;gap:8px;flex-wrap:wrap">
+      <div>
+        <h2 style="margin-bottom:4px">STEP 1 — 物件基本情報</h2>
+        <p class="desc" style="margin:0">物件の基本スペックを入力してください。謄本・公図・レントロールをアップロードするとAIが自動で読み取ります。</p>
+      </div>
+      <button class="btn btn-red" id="btnResetSim" style="white-space:nowrap" title="STEP1〜5の全入力をクリア（APIキー・登録物件は保持）">🆕 入力を全てクリア</button>
+    </div>
 
     <!-- 物件種別 ＋ 必要資料リスト -->
     <div style="margin-bottom:14px;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(14,165,233,0.10));border:1px solid rgba(245,158,11,0.35)">
@@ -4032,6 +4037,11 @@ setTimeout(()=>{
     location.reload();
   });
   $('#btnSeedSample')?.addEventListener('click', seedAzureMeguro);
+  $('#btnResetSim')?.addEventListener('click', ()=>{
+    if(confirm('STEP1〜5の入力をすべてクリアして新規モードで開始しますか？\n\n（登録済みの物件・APIキーは保持されます）')){
+      resetSimulatorForm();
+    }
+  });
 }, 200);
 
 /* ===== サンプル物件: アジュール目黒 ===== */
