@@ -3518,6 +3518,13 @@ function buildReportHTML(){
   const addr = `${b.pref||''} ${b.city||''} ${b.addr||''}`;
   const age = b.year ? (new Date().getFullYear()-b.year) : 0;
   const diff = R.modelB && R.priceMid>0 ? ((R.modelB.mid-R.priceMid)/R.priceMid*100) : 0;
+  const isLand = b.propertyType === '土地';
+  // 土地用：3パターン価格
+  const landTsubo = (b.land||0)*0.3025;
+  const avgUnit = STATE.landDeals?.avgUnitPriceMan || 0;
+  const lpMid = STATE.landPriceMid !== undefined ? Number(STATE.landPriceMid) : Math.round(avgUnit*landTsubo*10000);
+  const lpUp  = STATE.landPriceUp  !== undefined ? Number(STATE.landPriceUp)  : Math.round(lpMid*1.10);
+  const lpLow = STATE.landPriceLow !== undefined ? Number(STATE.landPriceLow) : Math.round(lpMid*0.90);
 
   // 用語集を3カテゴリずつ2ページに分割
   const allCats = [...new Set(GLOSSARY.map(g=>g.cat))];
@@ -3548,21 +3555,30 @@ function buildReportHTML(){
     </div>
 
     <h2>査定サマリー</h2>
+    ${isLand ? `
+    <div class="pdf-price-row">
+      <div class="pdf-price-card up"><div class="lbl">上振れ値（強気）</div><div class="val">${fmtMan(lpUp)}</div><div class="yld">坪単価 ${(lpUp/landTsubo/10000||0).toFixed(1)}万/坪</div></div>
+      <div class="pdf-price-card mid"><div class="lbl">中央値（査定）</div><div class="val">${fmtMan(lpMid)}</div><div class="yld">坪単価 ${(lpMid/landTsubo/10000||0).toFixed(1)}万/坪</div></div>
+      <div class="pdf-price-card low"><div class="lbl">下限値（保守）</div><div class="val">${fmtMan(lpLow)}</div><div class="yld">坪単価 ${(lpLow/landTsubo/10000||0).toFixed(1)}万/坪</div></div>
+    </div>
+    <div class="pdf-callout"><b>土地面積：</b>${(b.land||0).toFixed(2)}㎡（${landTsubo.toFixed(2)}坪）／ <b>周辺事例 平均坪単価：</b>${avgUnit>0?avgUnit.toFixed(1)+'万円/坪':'—'}</div>
+    ` : `
     <div class="pdf-price-row">
       <div class="pdf-price-card up"><div class="lbl">上振れ値</div><div class="val">${fmtMan(R.priceUp)}</div><div class="yld">CAP ${R.capMin.toFixed(2)}%</div></div>
       <div class="pdf-price-card mid"><div class="lbl">査定中央値</div><div class="val">${fmtMan(R.priceMid)}</div><div class="yld">CAP ${R.capMid.toFixed(2)}%</div></div>
       <div class="pdf-price-card low"><div class="lbl">下限値</div><div class="val">${fmtMan(R.priceLow)}</div><div class="yld">CAP ${R.capMax.toFixed(2)}%</div></div>
-    </div>
+    </div>`}
 
+    ${!isLand ? `
     <h3 style="margin-top:14px">主要指標</h3>
     <div class="pdf-kpi-row">
       <div class="pdf-kpi"><div class="l">満室想定 表面利回り</div><div class="v">${fmtP(R.grossYield)}</div></div>
       <div class="pdf-kpi"><div class="l">現況 表面利回り</div><div class="v">${fmtP(R.curYield)}</div></div>
       <div class="pdf-kpi"><div class="l">NOI利回り</div><div class="v">${fmtP(R.noiYield)}</div></div>
       <div class="pdf-kpi"><div class="l">投資回収年数</div><div class="v">${R.paybackY.toFixed(1)}年</div></div>
-    </div>
+    </div>` : ''}
 
-    ${(R.loanPaymentY>0 || R.leaseRentY>0) ? `
+    ${(!isLand && (R.loanPaymentY>0 || R.leaseRentY>0)) ? `
     <h3 style="margin-top:8px">融資・自己資金・借地</h3>
     <table class="pdf-table">
       <tr><th>年間返済額</th><th>年間CF</th><th>ROI</th><th>自己資金回収</th>${R.leaseRentY>0?'<th>年間地代</th>':''}</tr>
@@ -3575,13 +3591,28 @@ function buildReportHTML(){
       </tr>
     </table>` : ''}
 
+    ${!isLand ? `
     <h3 style="margin-top:14px">2モデル比較</h3>
     <table class="pdf-table">
       <tr><th style="width:30%">モデル</th><th style="width:25%">査定価格(中央値)</th><th>備考</th></tr>
       <tr><td>Model A 収益還元法</td><td class="num">${fmtMan(R.priceMid)}</td><td>NOI ÷ CAP ${R.capMid.toFixed(2)}%</td></tr>
       <tr><td>Model B 相場価格モデル</td><td class="num">${R.modelB?fmtMan(R.modelB.mid):'—'}</td><td>延床${(b.floor||0).toFixed(0)}㎡ × ${R.modelB?R.modelB.sqmMid.toFixed(1):'—'}万円/㎡</td></tr>
       <tr class="total"><td>乖離率</td><td class="num">${diff.toFixed(1)}%</td><td>${Math.abs(diff)>20?'⚠ 要再検証':'妥当範囲'}</td></tr>
-    </table>
+    </table>` : ''}
+
+    ${isLand && STATE.landDeals?.items?.length ? `
+    <h3 style="margin-top:14px">周辺土地取引事例（${STATE.landDeals.items.length}件・平均坪単価 ${avgUnit.toFixed(1)}万円/坪）</h3>
+    <table class="pdf-table">
+      <tr><th>所在地</th><th>取引時期</th><th>価格</th><th>面積</th><th>坪単価</th><th>備考</th></tr>
+      ${STATE.landDeals.items.slice(0,5).map(d=>`<tr>
+        <td>${d.address||'—'}</td>
+        <td>${d.deal_period||'—'}</td>
+        <td class="num">${d.price?Math.round(d.price/10000).toLocaleString()+'万円':'—'}</td>
+        <td class="num">${d.area_m2?d.area_m2.toFixed(2)+'㎡':'—'}</td>
+        <td class="num">${d.unit_price_man?d.unit_price_man.toFixed(1)+'万/坪':'—'}</td>
+        <td>${d.note||''}</td>
+      </tr>`).join('')}
+    </table>` : ''}
 
     ${pageFooter(1)}
   </div>
@@ -3606,17 +3637,19 @@ function buildReportHTML(){
       <tr class="total"><td colspan="2">合計</td><td class="num">${(b.land||0).toFixed(2)}</td><td></td></tr>
     </table>
 
+    ${!isLand ? `
     <h2>建物明細（${(b.buildings||[]).length}棟）</h2>
     <table class="pdf-table">
       <tr><th>建物名</th><th>構造</th><th>築年</th><th>延床（㎡）</th><th>備考</th></tr>
       ${(b.buildings||[]).map(bb=>`<tr><td>${bb.name||'—'}</td><td>${bb.struct||'—'}</td><td class="num">${bb.year||'—'}</td><td class="num">${(bb.floor||0).toFixed(2)}</td><td>${bb.note||''}</td></tr>`).join('')}
       <tr class="total"><td colspan="3">合計</td><td class="num">${(b.floor||0).toFixed(2)}</td><td>総戸数 ${b.units}戸</td></tr>
-    </table>
+    </table>` : ''}
 
     ${pageFooter(2)}
   </div>
 
-  <!-- ===== PAGE 3 : 年間収支＋レントロール ===== -->
+  ${!isLand ? `
+  <!-- ===== PAGE 3 : 年間収支＋レントロール（土地以外のみ） ===== -->
   <div class="pdf-page">
     <h1>年間収支 ／ レントロール</h1>
     <h2>年間収支（中央値ベース）</h2>
@@ -3648,6 +3681,7 @@ function buildReportHTML(){
 
     ${pageFooter(3)}
   </div>
+  ` : ''}
 
   <!-- ===== PAGE 4 : エリア情報＋相場根拠 ===== -->
   <div class="pdf-page">
@@ -3721,7 +3755,8 @@ function buildReportHTML(){
 
   <!-- ===== PAGE 5 : 将来予測＋AI所感＋査定者コメント ===== -->
   <div class="pdf-page">
-    <h1>将来10年予測 ／ 査定者コメント</h1>
+    <h1>${isLand ? '査定者コメント' : '将来10年予測 ／ 査定者コメント'}</h1>
+    ${!isLand ? `
     <h2>将来予測サマリー</h2>
     <table class="pdf-table">
       <tr><th style="width:25%">項目</th><th>現状</th><th>5年後</th><th>10年後</th></tr>
@@ -3746,6 +3781,7 @@ function buildReportHTML(){
     </div>
     <div class="pdf-callout"><b>出口戦略：</b>${STATE.futureAI.exit_strategy||''}</div>
     <div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11px;font-weight:700;margin:4px 0">🎯 ${STATE.futureAI.verdict||''}</div>
+    ` : ''}
     ` : ''}
 
     <h2>査定者コメント</h2>
