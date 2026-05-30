@@ -791,6 +791,31 @@
         <h3 style="font-size:13px;color:var(--blue);margin-bottom:8px">💡 利回り設定根拠</h3>
         <div id="mkComment" style="font-size:13px;line-height:1.7;color:var(--text)"></div>
       </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3 style="font-size:13px;color:var(--green);margin-bottom:8px">📋 類似取引事例（同エリア・同構造・築年類似）</h3>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">本物件の周辺で取引された一棟物件のうち、構造・築年数が類似する直近事例。表面利回り帯を査定基準として採用します。</div>
+        <div style="overflow-x:auto">
+          <table id="mkDealsTable" style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead>
+              <tr style="background:rgba(14,165,233,0.10);border-bottom:2px solid var(--line)">
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">事例</th>
+                <th style="padding:6px 8px;text-align:left">所在エリア</th>
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">構造</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">築年</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">戸数</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">販売価格</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">想定NOI</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap;background:rgba(16,185,129,0.10)">表面利回り</th>
+              </tr>
+            </thead>
+            <tbody id="mkDealsBody"><tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr></tbody>
+          </table>
+        </div>
+        <div id="mkDealsSummary" style="margin-top:10px;padding:10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;display:none">
+          📊 <b>周辺事例利回り帯：</b><span id="mkDealsRange">—</span>　／　<b>事例平均：</b><span id="mkDealsAvg">—</span>
+        </div>
+      </div>
     </div>
 
     <div class="actions">
@@ -829,6 +854,12 @@
       <div class="price-card up"><div class="label">上振れ値（強気）</div><div class="price" id="rsUp">¥0</div><div class="yld" id="rsUpY">CAP -% / 想定NOI -</div></div>
       <div class="price-card mid"><div class="label">査定中央値（標準）</div><div class="price" id="rsMid">¥0</div><div class="yld" id="rsMidY">CAP -% / 想定NOI -</div></div>
       <div class="price-card low"><div class="label">下限値（保守）</div><div class="price" id="rsLow">¥0</div><div class="yld" id="rsLowY">CAP -% / 想定NOI -</div></div>
+    </div>
+
+    <div id="rsBasisBanner" style="margin:8px 0 14px;padding:12px 14px;border-radius:10px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(16,185,129,0.08));border:1px solid rgba(14,165,233,0.30);font-size:12px;line-height:1.8">
+      <div style="font-weight:700;color:var(--blue);margin-bottom:4px">📊 査定根拠</div>
+      <div>類似物件（同エリア・同構造・築年類似）の周辺事例 <b id="rsBasisDealCount">—</b> から算出した<b>表面利回り帯 <span id="rsBasisYieldRange" style="color:var(--green)">—</span></b> を基準に、収益還元法（NOI ÷ CAP RATE）で<b>査定価格 <span id="rsBasisPriceRange" style="color:var(--blue)">—</span></b> を算出。</div>
+      <div style="font-size:10px;color:var(--sub);margin-top:4px">※ 上限値=最良CAP、下限値=保守CAP。詳細はSTEP4「類似取引事例」を参照</div>
     </div>
 
     <div class="kpi">
@@ -1477,6 +1508,21 @@ function renderResult(R){
   $('#rsUpY').textContent  = `CAP ${R.capMin.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
   $('#rsMidY').textContent = `CAP ${R.capMid.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
   $('#rsLowY').textContent = `CAP ${R.capMax.toFixed(2)}% / NOI ${fmtMan(R.NOI)}`;
+
+  // 査定根拠バナー
+  const bDeals = (STATE.market && Array.isArray(STATE.market.comparable_deals)) ? STATE.market.comparable_deals : [];
+  const bYlds = bDeals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
+  if($('#rsBasisDealCount')){
+    if(bYlds.length){
+      const bMn = Math.min(...bYlds), bMx = Math.max(...bYlds);
+      $('#rsBasisDealCount').textContent = `${bYlds.length}件`;
+      $('#rsBasisYieldRange').textContent = `${bMn.toFixed(2)}% 〜 ${bMx.toFixed(2)}%`;
+    }else{
+      $('#rsBasisDealCount').textContent = '（STEP4 AI相場調査未実施）';
+      $('#rsBasisYieldRange').textContent = `CAP ${R.capMin.toFixed(2)}% 〜 ${R.capMax.toFixed(2)}%（標準値）`;
+    }
+    $('#rsBasisPriceRange').textContent = `${fmtMan(R.priceLow)} 〜 ${fmtMan(R.priceUp)}`;
+  }
 
   $('#rsGY').textContent = fmtP(R.grossYield);
   $('#rsCY').textContent = fmtP(R.curYield);
@@ -2415,8 +2461,10 @@ $('#btnFetchMarket').onclick = async ()=>{
 
   try{
     const prompt = `あなたは日本の収益不動産投資のエキスパートです。
-以下の物件について、周辺類似物件の相場帯（収益還元利回り・㎡単価）を推定してください。
-ネット上の中古一棟マンション・アパート相場感、エリアトレンド、人口動態、賃貸需要をふまえて回答すること。
+以下の物件について、周辺類似物件（同エリア・同構造・築年数±3〜5年）の過去取引事例を3〜5件想定し、
+そこから表面利回り帯（min〜max）を算出してください。さらにエリアトレンド・賃貸需要をふまえて
+収益還元利回り・㎡単価の相場帯も推定してください。
+楽待・健美家・国交省レインズ・不動産情報ライブラリ等で公開されている中古一棟物件の取引相場感を反映すること。
 
 【物件情報】
 - 所在地：${STATE.basic.pref} ${STATE.basic.city} ${STATE.basic.addr}
@@ -2427,20 +2475,44 @@ $('#btnFetchMarket').onclick = async ()=>{
 - 土地面積：${STATE.basic.land}㎡
 - 現況：${STATE.basic.status}
 
+【類似事例の選定基準】
+- エリア：同一市区町村または徒歩圏／近隣駅圏内
+- 構造：同一（${STATE.basic.struct}）
+- 築年数：本物件と±3〜5年以内
+- 戸数：本物件と同等規模（概ね50〜200%レンジ）
+- 直近2〜3年以内の販売事例（成約/売出）
+
 【回答フォーマット】
 必ず以下のJSONのみで回答してください。前置き・解説・コードブロック装飾は一切不要です。
 
 {
+  "comparable_deals": [
+    {
+      "label": "事例A",
+      "area": "○○区○○エリア",
+      "structure": "RC造",
+      "age_years": 築年数,
+      "units": 戸数,
+      "price_man": 販売価格（万円）,
+      "noi_man": 想定NOI（年・万円）,
+      "gross_yield": 表面利回り（%、小数2桁）,
+      "note": "備考30字以内（成約時期・特徴）"
+    }
+  ],
   "cap_rate": { "min": 数値, "mid": 数値, "max": 数値 },
   "vacancy_rate_estimate": 数値,
   "price_per_sqm": { "min": 数値, "mid": 数値, "max": 数値 },
   "area_trend": "エリア動向コメント100字以内",
-  "market_comment": "利回り設定根拠150字以内",
+  "market_comment": "事例利回り帯と本物件への適用根拠を150字以内で記載",
   "risk_factors": ["リスク1", "リスク2", "リスク3"],
   "strength_factors": ["強み1", "強み2", "強み3"]
 }
 
-数値はパーセンテージは数値のみ（例: 7.5）、㎡単価は万円単位の数値（例: 25.3）。`;
+【数値ルール】
+- comparable_deals は3〜5件必須
+- 各事例の gross_yield = noi_man ÷ price_man × 100 で算出した値と整合させること
+- cap_rate.min/mid/max は comparable_deals の利回り分布から算出（min=最良案件、max=保守案件）
+- パーセンテージは数値のみ（例: 7.50）、㎡単価は万円単位の数値（例: 25.3）`;
 
     const text = await callClaude([{role:'user',content:prompt}], '', 2500);
     const data = extractJson(text);
@@ -2455,6 +2527,38 @@ $('#btnFetchMarket').onclick = async ()=>{
     $('#mkComment').textContent = data.market_comment;
     $('#mkStrength').innerHTML = (data.strength_factors||[]).map(s=>`<span class="tag strength">${s}</span>`).join('');
     $('#mkRisk').innerHTML = (data.risk_factors||[]).map(s=>`<span class="tag risk">${s}</span>`).join('');
+
+    // 類似取引事例テーブル
+    const deals = Array.isArray(data.comparable_deals) ? data.comparable_deals : [];
+    const tbody = $('#mkDealsBody');
+    if(tbody){
+      if(deals.length){
+        tbody.innerHTML = deals.map((d,i)=>{
+          const yld = Number(d.gross_yield)||0;
+          return `<tr style="border-bottom:1px solid var(--line)">
+            <td style="padding:6px 8px;font-weight:600">${d.label||('事例'+(i+1))}</td>
+            <td style="padding:6px 8px">${d.area||'—'}</td>
+            <td style="padding:6px 8px;white-space:nowrap">${d.structure||'—'}</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap">築${d.age_years||'—'}年</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap">${d.units||'—'}戸</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap">${(Number(d.price_man)||0).toLocaleString()} 万円</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap">${(Number(d.noi_man)||0).toLocaleString()} 万円</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap;background:rgba(16,185,129,0.06);font-weight:700;color:var(--green)">${yld.toFixed(2)}%</td>
+          </tr>${d.note?`<tr><td colspan="8" style="padding:2px 12px 8px;font-size:10px;color:var(--sub);border-bottom:1px solid var(--line)">└ ${d.note}</td></tr>`:''}`;
+        }).join('');
+        const ylds = deals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
+        if(ylds.length){
+          const mn = Math.min(...ylds), mx = Math.max(...ylds);
+          const avg = ylds.reduce((a,b)=>a+b,0)/ylds.length;
+          $('#mkDealsRange').textContent = `${mn.toFixed(2)}% 〜 ${mx.toFixed(2)}%（${ylds.length}件）`;
+          $('#mkDealsAvg').textContent = `${avg.toFixed(2)}%`;
+          $('#mkDealsSummary').style.display = 'block';
+        }
+      }else{
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">類似取引事例の取得に失敗しました</td></tr>';
+        $('#mkDealsSummary').style.display = 'none';
+      }
+    }
 
     // 経費フォームのCAPも更新
     $('#capMin').value = data.cap_rate.min.toFixed(2);
@@ -3743,6 +3847,29 @@ function buildReportHTML(){
     ` : '<div class="pdf-callout">エリア情報AI調査が未実施のためデータなし</div>'}
 
     ${m ? `
+    ${(Array.isArray(m.comparable_deals) && m.comparable_deals.length) ? `
+    <h2>類似取引事例（同エリア・同構造・築年類似）</h2>
+    <table class="pdf-table" style="font-size:9px">
+      <tr><th>事例</th><th>所在エリア</th><th>構造</th><th>築年</th><th>戸数</th><th>販売価格</th><th>想定NOI</th><th>表面利回り</th></tr>
+      ${m.comparable_deals.map((d,i)=>`<tr>
+        <td>${d.label||('事例'+(i+1))}</td>
+        <td>${d.area||'—'}</td>
+        <td>${d.structure||'—'}</td>
+        <td class="num">築${d.age_years||'—'}年</td>
+        <td class="num">${d.units||'—'}戸</td>
+        <td class="num">${(Number(d.price_man)||0).toLocaleString()} 万円</td>
+        <td class="num">${(Number(d.noi_man)||0).toLocaleString()} 万円</td>
+        <td class="num"><b>${(Number(d.gross_yield)||0).toFixed(2)}%</b></td>
+      </tr>`).join('')}
+    </table>
+    ${(()=>{
+      const ys = m.comparable_deals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
+      if(!ys.length) return '';
+      const mn = Math.min(...ys), mx = Math.max(...ys), av = ys.reduce((a,b)=>a+b,0)/ys.length;
+      return `<div class="pdf-callout"><b>周辺事例利回り帯：</b>${mn.toFixed(2)}% 〜 ${mx.toFixed(2)}%（${ys.length}件）／<b>平均：</b>${av.toFixed(2)}%　→ この利回り帯を本物件査定の基準として採用</div>`;
+    })()}
+    ` : ''}
+
     <h2>採用CAP RATE・㎡単価相場帯</h2>
     <table class="pdf-table">
       <tr><th>区分</th><th>CAP %</th><th>査定価格</th><th>㎡単価</th></tr>
@@ -3898,6 +4025,16 @@ function resetSimulatorForm(){
   ['mkStrength','mkRisk'].forEach(id=>{
     const el = $('#'+id); if(el) el.innerHTML = '';
   });
+  // 類似取引事例テーブルを初期メッセージに戻す
+  const mkBody = $('#mkDealsBody');
+  if(mkBody) mkBody.innerHTML = '<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr>';
+  if($('#mkDealsSummary')) $('#mkDealsSummary').style.display = 'none';
+  if($('#mkDealsRange')) $('#mkDealsRange').textContent = '—';
+  if($('#mkDealsAvg')) $('#mkDealsAvg').textContent = '—';
+  // STEP5 査定根拠バナーも初期化
+  if($('#rsBasisDealCount')) $('#rsBasisDealCount').textContent = '—';
+  if($('#rsBasisYieldRange')) $('#rsBasisYieldRange').textContent = '—';
+  if($('#rsBasisPriceRange')) $('#rsBasisPriceRange').textContent = '—';
   // 編集中物件IDだけ消す（snapshotは新規空状態として保存→F5で空が復元される）
   localStorage.removeItem(CURRENT_ID_KEY);
   // URLハッシュを消す（F5時の混乱防止）
