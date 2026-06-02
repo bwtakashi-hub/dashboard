@@ -1315,11 +1315,65 @@ function landAddRow(d={}){
 }
 function recalcLand(){
   let total = 0;
+  let emptyCount = 0;
   $$('#landBody tr').forEach(tr=>{
-    total += Number(tr.querySelector('.land-area').value)||0;
+    const areaEl = tr.querySelector('.land-area');
+    const v = Number(areaEl.value)||0;
+    total += v;
+    // 空欄/0 の面積行を黄色強調
+    if(!v && areaEl.value === ''){
+      areaEl.style.background = '#fef9c3';
+      areaEl.style.border = '1.5px solid #f59e0b';
+      emptyCount++;
+    } else {
+      areaEl.style.background = '';
+      areaEl.style.border = '';
+    }
   });
-  $('#landTotal').textContent = total.toFixed(2) + ' ㎡';
+  const totalEl = $('#landTotal');
+  if(emptyCount > 0 && total === 0){
+    totalEl.innerHTML = `<span style="color:#f59e0b">0.00 ㎡ <span style="font-size:10px">⚠ ${emptyCount}行未入力</span></span>`;
+  } else {
+    totalEl.textContent = total.toFixed(2) + ' ㎡';
+  }
   $('#landTsubo').textContent = (total*0.3025).toFixed(2) + ' 坪';
+  // 備考に「合計○○㎡」がある場合は自動抽出ヒント表示
+  detectLandTotalHint();
+}
+
+/* 備考から合計面積を抽出し、未入力行へ按分するヒント表示 */
+function detectLandTotalHint(){
+  const rows = $$('#landBody tr');
+  if(!rows.length) return;
+  let hintArea = 0;
+  for(const tr of rows){
+    const note = tr.querySelector('.land-note')?.value || '';
+    const m = note.match(/(?:合計|総面積)[^\d]*(\d+(?:\.\d+)?)[^\d]*㎡/);
+    if(m){ hintArea = Number(m[1]); break; }
+  }
+  const emptyRows = rows.filter(tr=>{
+    const v = tr.querySelector('.land-area').value;
+    return v === '' || Number(v) === 0;
+  });
+  let hintEl = $('#landAutoSplitHint');
+  if(hintArea > 0 && emptyRows.length > 0){
+    if(!hintEl){
+      hintEl = document.createElement('div');
+      hintEl.id = 'landAutoSplitHint';
+      hintEl.style.cssText = 'margin:6px 0;padding:8px 12px;border-radius:8px;background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.40);font-size:11px;color:#f59e0b';
+      $('#landBody').parentElement.parentElement.insertBefore(hintEl, $('#landBody').parentElement.nextSibling);
+    }
+    const splitArea = (hintArea / rows.length).toFixed(2);
+    hintEl.innerHTML = `💡 備考に「合計${hintArea}㎡」を検出。${rows.length}筆で按分すると 1筆あたり <b>${splitArea}㎡</b>。<button id="btnLandSplit" style="margin-left:8px;padding:3px 10px;border-radius:6px;background:#f59e0b;color:#fff;border:none;cursor:pointer;font-weight:700">未入力${emptyRows.length}行へ自動按分</button>`;
+    $('#btnLandSplit').onclick = ()=>{
+      emptyRows.forEach(tr=>{ tr.querySelector('.land-area').value = splitArea; });
+      hintEl.remove();
+      recalcLand();
+      if(typeof showToast === 'function') showToast(`✅ ${emptyRows.length}筆に按分（各${splitArea}㎡）`,'success');
+    };
+  } else if(hintEl){
+    hintEl.remove();
+  }
 }
 $('#addLand').onclick = ()=>landAddRow();
 landAddRow();
@@ -3536,6 +3590,15 @@ $('#btnOcrBasic').onclick = async ()=>{
 - 「推定」「類推」「相場から推測」等で値を埋めることは絶対禁止
 - 不明な築年・面積・地番・地目を勝手に入れない
 
+【土地面積 area の取り扱い - 最重要】
+- 各筆ごとの「地積」を必ず数値で area フィールドに入れる
+- 謄本に「地積：220.50㎡」のように記載されている数字を読み取る
+- 共有持分の場合：その筆の地積全体（持分前の総面積）を area に入れる
+- 持分情報は note に「持分○分の○」と記載
+- area が 0 や null のままで note にだけ合計値を書くのは禁止
+  → 例：×「area:0, note:"合計671.49㎡"」 ◯「各筆の area に個別地積を必ず入れる」
+- もし謄本に各筆の地積が見えず合計値しか取得できない場合は、area=0 ではなく、合計値÷筆数で按分した数値を入れて note に "合計値○○㎡を○筆で按分推定" と明記
+
 前置き・解説・コードブロック装飾は不要、JSONのみ。
 
 {
@@ -3545,7 +3608,7 @@ $('#btnOcrBasic').onclick = async ()=>{
   "city": "市区町村",
   "addr": "番地・建物名",
   "lands": [
-    {"chiban": "地番（例 123-4）", "chimoku": "地目（宅地/雑種地/田/畑/山林等）", "area": 面積㎡数値, "note": "備考"}
+    {"chiban": "地番（例 123-4）", "chimoku": "地目（宅地/雑種地/田/畑/山林等）", "area": 各筆の地積㎡（数値必須、0禁止）, "note": "持分等の備考"}
   ],
   "buildings": [
     {"name": "建物名/種類（例 本館/A棟）", "struct": "構造（RC/SRC/重量鉄骨/軽量鉄骨/木造）", "year": 築年西暦数値, "floor": 延床面積㎡数値, "note": "備考"}
