@@ -356,6 +356,8 @@
       <input type="password" id="reinfoKey" placeholder="GASプロキシURL or 不動産Lib APIキー" autocomplete="off" style="width:240px;font-family:monospace;font-size:11px" title="GASプロキシのWebアプリURL（推奨）または不動産情報ライブラリのAPIキー（CORS未対応）" />
       <button class="btn btn-ghost" id="saveKey" style="padding:6px 10px;font-size:11px">保存</button>
       <button class="btn btn-ghost" id="toggleKey" style="padding:6px 8px;font-size:11px" title="表示/非表示">👁</button>
+      <button class="btn btn-ghost" id="exportKeys" style="padding:6px 8px;font-size:11px" title="3つのAPIキーをクリップボードへエクスポート（別PC移行用）">📤</button>
+      <button class="btn btn-ghost" id="importKeys" style="padding:6px 8px;font-size:11px" title="エクスポートしたJSONをインポート（別PCから移行）">📥</button>
       <button class="btn btn-ghost" id="openGlossary" style="padding:6px 8px;font-size:11px" title="不動産投資 用語集">📖</button>
       <button class="btn btn-red" id="clearData" style="padding:6px 8px;font-size:11px" title="現在の編集中データのみクリア（APIキー・登録物件は保持）">🗑</button>
     </div>
@@ -1076,10 +1078,67 @@
  *  Vanilla JS / Claude API / Chart.js / jsPDF
  * ========================================================= */
 
+/* ===== 安全ストレージ：localStorage優先 / IndexedDBフォールバック =====
+   Edgeの追跡防止/プライベートモード等で localStorage がブロックされても
+   IndexedDB に書き込むことで APIキーの永続保存を保証する */
+const safeStorage = (function(){
+  const DB_NAME = 'sumapp_storage', STORE = 'kv';
+  function _open(){
+    return new Promise((res, rej)=>{
+      try{
+        const r = indexedDB.open(DB_NAME, 1);
+        r.onupgradeneeded = e => { try{ e.target.result.createObjectStore(STORE); }catch(_){} };
+        r.onsuccess = e => res(e.target.result);
+        r.onerror = e => rej(e.target.error);
+        r.onblocked = ()=>rej(new Error('idb blocked'));
+      }catch(e){ rej(e); }
+    });
+  }
+  async function _idbGet(key){
+    try{
+      const db = await _open();
+      return await new Promise((res,rej)=>{
+        const tx = db.transaction(STORE,'readonly');
+        const rq = tx.objectStore(STORE).get(key);
+        rq.onsuccess = ()=>res(rq.result);
+        rq.onerror = ()=>rej(rq.error);
+      });
+    }catch(_){ return null; }
+  }
+  async function _idbSet(key, val){
+    try{
+      const db = await _open();
+      await new Promise((res,rej)=>{
+        const tx = db.transaction(STORE,'readwrite');
+        tx.objectStore(STORE).put(val, key);
+        tx.oncomplete = ()=>res();
+        tx.onerror = ()=>rej(tx.error);
+      });
+      return true;
+    }catch(_){ return false; }
+  }
+  function _lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+  function _lsSet(k,v){
+    try{ localStorage.setItem(k, v); return localStorage.getItem(k) === v; }catch(_){ return false; }
+  }
+  return {
+    getSync(key){ return _lsGet(key) || ''; },
+    async get(key){
+      const v = _lsGet(key); if(v) return v;
+      return (await _idbGet(key)) || '';
+    },
+    async set(key, val){
+      const lsOk = _lsSet(key, val);
+      const idbOk = await _idbSet(key, val);
+      return { localStorage: lsOk, indexedDB: idbOk, ok: lsOk || idbOk };
+    }
+  };
+})();
+
 const STATE = {
-  apiKey: localStorage.getItem('claude_api_key') || '',
-  driveKey: localStorage.getItem('drive_api_key') || '',
-  reinfoKey: localStorage.getItem('reinfo_api_key') || '',
+  apiKey: safeStorage.getSync('claude_api_key'),
+  driveKey: safeStorage.getSync('drive_api_key'),
+  reinfoKey: safeStorage.getSync('reinfo_api_key'),
   step: 1,
   basic: {},
   rentRoll: [],
@@ -1138,17 +1197,73 @@ $('#toggleKey').onclick = ()=>{
   $('#driveKey').type = isPwd ? 'text' : 'password';
   if($('#reinfoKey')) $('#reinfoKey').type = isPwd ? 'text' : 'password';
 };
-$('#saveKey').onclick = ()=>{
+$('#saveKey').onclick = async ()=>{
   STATE.apiKey = $('#apiKey').value.trim();
   STATE.driveKey = $('#driveKey').value.trim();
   STATE.reinfoKey = $('#reinfoKey')?.value.trim() || '';
-  localStorage.setItem('claude_api_key', STATE.apiKey);
-  localStorage.setItem('drive_api_key', STATE.driveKey);
-  localStorage.setItem('reinfo_api_key', STATE.reinfoKey);
+  const r1 = await safeStorage.set('claude_api_key', STATE.apiKey);
+  const r2 = await safeStorage.set('drive_api_key', STATE.driveKey);
+  const r3 = await safeStorage.set('reinfo_api_key', STATE.reinfoKey);
   refreshApiStatus();
-  showToast('APIキーを保存しました','success');
+  if(r1.ok && r2.ok && r3.ok){
+    const via = (r1.localStorage && r2.localStorage && r3.localStorage) ? 'localStorage' :
+                (r1.indexedDB || r2.indexedDB || r3.indexedDB) ? 'IndexedDB（追跡防止対応）' : 'localStorage';
+    showToast(`✅ APIキーを保存しました（${via}）`,'success');
+  } else {
+    showToast('❌ ブラウザがすべてのストレージを拒否しました。プライベートモード解除またはCookie許可してください','error');
+  }
 };
 refreshApiStatus();
+
+/* 起動時：localStorage が空でも IndexedDB から復元 */
+(async ()=>{
+  let changed = false;
+  if(!STATE.apiKey){    const v = await safeStorage.get('claude_api_key'); if(v){ STATE.apiKey = v; if($('#apiKey')) $('#apiKey').value = v; changed = true; } }
+  if(!STATE.driveKey){  const v = await safeStorage.get('drive_api_key'); if(v){ STATE.driveKey = v; if($('#driveKey')) $('#driveKey').value = v; changed = true; } }
+  if(!STATE.reinfoKey){ const v = await safeStorage.get('reinfo_api_key'); if(v){ STATE.reinfoKey = v; if($('#reinfoKey')) $('#reinfoKey').value = v; changed = true; } }
+  if(changed){ refreshApiStatus(); showToast('🔓 IndexedDBから保存済APIキーを復元しました','success'); }
+})();
+
+/* ===== APIキー エクスポート/インポート（PC間移行用） ===== */
+window.exportApiKeys = function(){
+  const obj = {
+    claude_api_key: STATE.apiKey,
+    drive_api_key: STATE.driveKey,
+    reinfo_api_key: STATE.reinfoKey,
+    exported_at: new Date().toISOString()
+  };
+  const json = JSON.stringify(obj, null, 2);
+  // クリップボードコピー
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(json).then(()=>{
+      showToast('📋 APIキーをクリップボードにコピーしました（別PCで importApiKeys() に貼り付け）','success');
+    }).catch(()=>{
+      prompt('以下をコピーして別PCで importApiKeys("...") に貼り付け:', json);
+    });
+  } else {
+    prompt('以下をコピーして別PCで importApiKeys("...") に貼り付け:', json);
+  }
+  return json;
+};
+// UIボタンバインド
+setTimeout(()=>{
+  $('#exportKeys')?.addEventListener('click', ()=>window.exportApiKeys());
+  $('#importKeys')?.addEventListener('click', ()=>{
+    const json = prompt('別PCの📤ボタンでコピーしたJSONを貼り付けてください：');
+    if(json && json.trim()) window.importApiKeys(json.trim());
+  });
+}, 100);
+
+window.importApiKeys = async function(jsonStr){
+  let obj;
+  try{ obj = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; }
+  catch(e){ showToast('❌ JSON形式が不正です','error'); return; }
+  if(obj.claude_api_key){ STATE.apiKey = obj.claude_api_key; if($('#apiKey')) $('#apiKey').value = obj.claude_api_key; await safeStorage.set('claude_api_key', obj.claude_api_key); }
+  if(obj.drive_api_key){ STATE.driveKey = obj.drive_api_key; if($('#driveKey')) $('#driveKey').value = obj.drive_api_key; await safeStorage.set('drive_api_key', obj.drive_api_key); }
+  if(obj.reinfo_api_key){ STATE.reinfoKey = obj.reinfo_api_key; if($('#reinfoKey')) $('#reinfoKey').value = obj.reinfo_api_key; await safeStorage.set('reinfo_api_key', obj.reinfo_api_key); }
+  refreshApiStatus();
+  showToast('✅ APIキーをインポートしました','success');
+};
 
 /* ---------- Money input formatter ---------- */
 function bindMoneyInputs(root=document){
