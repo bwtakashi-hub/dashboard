@@ -794,11 +794,12 @@
 
       <div class="card" style="margin-top:14px">
         <h3 style="font-size:13px;color:var(--green);margin-bottom:8px">📋 類似取引事例（同エリア・同構造・築年類似）</h3>
-        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">本物件の周辺で取引された一棟物件のうち、構造・築年数が類似する直近事例。表面利回り帯を査定基準として採用します。</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">国土交通省「不動産情報ライブラリ」XIT001（<b>レインズ匿名化成約データ含む</b>）から本物件周辺の実取引を取得。不足分はAIが類似事例を推定補完。表面利回り帯を査定基準として採用します。</div>
         <div style="overflow-x:auto">
           <table id="mkDealsTable" style="width:100%;font-size:11px;border-collapse:collapse">
             <thead>
               <tr style="background:rgba(14,165,233,0.10);border-bottom:2px solid var(--line)">
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">出典</th>
                 <th style="padding:6px 8px;text-align:left;white-space:nowrap">事例</th>
                 <th style="padding:6px 8px;text-align:left">所在エリア</th>
                 <th style="padding:6px 8px;text-align:left;white-space:nowrap">構造</th>
@@ -809,7 +810,7 @@
                 <th style="padding:6px 8px;text-align:right;white-space:nowrap;background:rgba(16,185,129,0.10)">表面利回り</th>
               </tr>
             </thead>
-            <tbody id="mkDealsBody"><tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr></tbody>
+            <tbody id="mkDealsBody"><tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr></tbody>
           </table>
         </div>
         <div id="mkDealsSummary" style="margin-top:10px;padding:10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;display:none">
@@ -1512,10 +1513,12 @@ function renderResult(R){
   // 査定根拠バナー
   const bDeals = (STATE.market && Array.isArray(STATE.market.comparable_deals)) ? STATE.market.comparable_deals : [];
   const bYlds = bDeals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
+  const bOfficial = bDeals.filter(d=>/国交省|公式|レインズ|XIT/.test(String(d.source||''))).length;
   if($('#rsBasisDealCount')){
     if(bYlds.length){
       const bMn = Math.min(...bYlds), bMx = Math.max(...bYlds);
-      $('#rsBasisDealCount').textContent = `${bYlds.length}件`;
+      const officialTxt = bOfficial>0 ? `${bYlds.length}件（うち<b style="color:var(--green)">国交省公式 ${bOfficial}件</b>）` : `${bYlds.length}件（AI推定のみ）`;
+      $('#rsBasisDealCount').innerHTML = officialTxt;
       $('#rsBasisYieldRange').textContent = `${bMn.toFixed(2)}% 〜 ${bMx.toFixed(2)}%`;
     }else{
       $('#rsBasisDealCount').textContent = '（STEP4 AI相場調査未実施）';
@@ -2104,9 +2107,94 @@ const ZOOM_BY_API = {
   // 防災系
   XKT016:13, XKT020:13, XKT021:13, XKT022:13, XKT025:13,
   XKT026:13, XKT027:13, XKT028:13, XKT029:13,
+  // 取引価格情報（XIT001: レインズ匿名化成約データ含む / XIT002: 取引価格情報[詳細]）
+  XIT001:13, XIT002:13,
   // その他統計
   XKT013:13, XKT031:13,
 };
+
+/* =========================================================
+ *  XIT001：不動産取引価格情報（レインズ匿名化成約データ含む）
+ *  本物件周辺の実取引事例を取得し、構造・築年で類似事例をフィルタ
+ * ========================================================= */
+async function fetchTransactionDeals(lat, lon, targetStruct, targetYear, options){
+  const opt = options || {};
+  const maxResults = opt.maxResults || 12;
+  const radiusKm = opt.radiusKm || 3;
+  const yearTolerance = opt.yearTolerance || 8;
+  // XIT001 から取得（複数zoom試行）
+  let data = null;
+  try { data = await fetchReinfoAPI('XIT001', lat, lon, 13); } catch(e){ /* fallback */ }
+  if(!data || !data.features){
+    try { data = await fetchReinfoAPI('XIT002', lat, lon, 13); } catch(e){}
+  }
+  if(!data || !Array.isArray(data.features)) return [];
+  // 構造名の正規化
+  const normStruct = s => String(s||'').replace(/造|構造|\s/g,'').toUpperCase()
+    .replace(/RC.*/,'RC').replace(/SRC.*/,'SRC').replace(/木.*/,'W').replace(/鉄骨/,'S');
+  const tgtStr = normStruct(targetStruct);
+  const tgtYear = Number(targetYear)||0;
+  const nowY = 2026;
+  const deals = [];
+  for(const f of data.features){
+    const p = f.properties || {};
+    const c = f.geometry ? geometryCenter(f.geometry) : null;
+    if(!c) continue;
+    const [plon, plat] = c;
+    const dist = haversineKm(lat, lon, plat, plon);
+    if(dist > radiusKm) continue;
+    // 価格・面積・構造・築年の取り出し（プロパティ名は仕様により複数候補）
+    const priceTxt = p.u_transaction_price_total_ja || p.transaction_price_total_ja
+                   || p.u_trade_price_ja || p.trade_price_ja || p.price || '';
+    const price = Number(String(priceTxt).replace(/[^\d.]/g,''))||0;
+    if(!price) continue;
+    const useNm = p.u_use_ja || p.use_name_ja || p.use_ja || p.use || '';
+    const useTp = p.u_use_type_ja || p.type_name_ja || p.type_ja || p.type || '';
+    // 一棟物件のみ抽出（土地のみ・区分マンションは除外）
+    const isApt = /共同住宅|アパート|マンション|賃貸住宅|一棟/.test(useNm + useTp);
+    const isCondo = /中古マンション|区分/.test(useNm + useTp) && !isApt;
+    if(isCondo) continue;
+    const structRaw = p.u_building_structure_ja || p.building_structure_ja || p.structure || '';
+    const dealStr = normStruct(structRaw);
+    const yearRaw = p.u_construction_year_ja || p.construction_year_ja || p.building_year_ja || '';
+    const yearNum = Number(String(yearRaw).replace(/[^\d]/g,''))||0;
+    const ageNum = yearNum ? (nowY - yearNum) : 0;
+    // 構造一致（指定があれば）
+    let structMatch = true;
+    if(tgtStr && dealStr){
+      structMatch = (tgtStr === dealStr) || (tgtStr.startsWith(dealStr)) || (dealStr.startsWith(tgtStr));
+    }
+    // 築年近接（指定があれば ±yearTolerance）
+    let yearMatch = true;
+    if(tgtYear && yearNum) yearMatch = Math.abs(yearNum - tgtYear) <= yearTolerance;
+    const area = Number(String(p.u_land_area_ja||p.land_area_ja||p.u_floor_area_ja||p.floor_area_ja||'').replace(/[^\d.]/g,''))||0;
+    deals.push({
+      label: '公式事例',
+      area_name: p.u_city_name_ja || p.city_name_ja || p.district_name_ja || '—',
+      district: p.u_district_name_ja || p.district_name_ja || '',
+      structure: structRaw || '—',
+      age_years: ageNum || null,
+      build_year: yearNum || null,
+      land_or_floor_m2: area,
+      price_man: Math.round(price / 10000),
+      price_yen: price,
+      use: useNm,
+      use_type: useTp,
+      period: p.point_in_time_name_ja || p.period_name_ja || p.period_ja || '—',
+      distance_km: Number(dist.toFixed(2)),
+      structMatch, yearMatch,
+      _isApt: isApt,
+    });
+  }
+  // 一棟系を優先、次に構造一致、次に築年一致、最後に距離順
+  deals.sort((a,b)=>{
+    if(a._isApt !== b._isApt) return a._isApt ? -1 : 1;
+    if(a.structMatch !== b.structMatch) return a.structMatch ? -1 : 1;
+    if(a.yearMatch !== b.yearMatch) return a.yearMatch ? -1 : 1;
+    return a.distance_km - b.distance_km;
+  });
+  return deals.slice(0, maxResults);
+}
 
 /* 400エラー時のリトライzoom候補 */
 const RETRY_ZOOMS = [13, 12, 14, 11, 15];
@@ -2457,14 +2545,37 @@ $('#btnFetchMarket').onclick = async ()=>{
   }
   $('#aiLoad').classList.remove('hide');
   $('#aiResult').classList.add('hide');
-  $('#aiMsg').textContent = 'Claude APIに問い合わせ中…';
+  $('#aiMsg').textContent = '国交省 不動産取引価格情報（レインズ匿名化データ）を取得中…';
+
+  // 公式取引事例（XIT001）を先に取得して Claude プロンプトに渡す
+  let officialDeals = [];
+  try{
+    const addr = `${STATE.basic.pref}${STATE.basic.city}${STATE.basic.addr||''}`;
+    const geo = await geocodeAddress(addr);
+    if(geo && geo.lat && geo.lon && STATE.reinfoKey){
+      officialDeals = await fetchTransactionDeals(geo.lat, geo.lon, STATE.basic.struct, STATE.basic.year, { maxResults:10, radiusKm:3, yearTolerance:10 });
+    }
+  }catch(e){ console.warn('XIT001取得失敗:', e.message); }
+
+  $('#aiMsg').textContent = officialDeals.length
+    ? `公式取引事例 ${officialDeals.length}件 取得 → Claude APIで利回り分析中…`
+    : 'Claude APIに問い合わせ中…（公式取引データなし）';
 
   try{
+    const officialDealsBlock = officialDeals.length ? `
+
+【国交省「不動産情報ライブラリ」XIT001 取得実取引（レインズ匿名化成約データ含む）】
+以下は本物件周辺3km圏内の実取引データです。これらを優先的に類似事例として参照し、想定NOI・想定表面利回りを算出してください。
+${officialDeals.map((d,i)=>`${i+1}. エリア=${d.area_name}${d.district?'/'+d.district:''} | 構造=${d.structure} | 築${d.age_years||'?'}年(${d.build_year||'?'}年築) | 用途=${d.use||d.use_type} | 取引時期=${d.period} | 取引価格=${d.price_man.toLocaleString()}万円 | 面積=${d.land_or_floor_m2||'?'}㎡ | 距離=${d.distance_km}km`).join('\n')}
+
+【重要】上記実取引データの収益性（想定NOI・表面利回り）を算出する際は、エリアの賃貸相場（一棟マンション/アパートの坪当たり賃料・戸あたり想定家賃）から推定し、各事例に "source": "国交省公式" を設定してください。
+` : '';
+
     const prompt = `あなたは日本の収益不動産投資のエキスパートです。
-以下の物件について、周辺類似物件（同エリア・同構造・築年数±3〜5年）の過去取引事例を3〜5件想定し、
+以下の物件について、周辺類似物件（同エリア・同構造・築年数±3〜5年）の過去取引事例を3〜5件示し、
 そこから表面利回り帯（min〜max）を算出してください。さらにエリアトレンド・賃貸需要をふまえて
 収益還元利回り・㎡単価の相場帯も推定してください。
-楽待・健美家・国交省レインズ・不動産情報ライブラリ等で公開されている中古一棟物件の取引相場感を反映すること。
+${officialDeals.length ? '※下記の国交省公式取引データを最優先で類似事例として採用し、不足分のみAI推定で補ってください。' : '※公式取引データが取得できなかったため、楽待・健美家・国交省レインズ・不動産情報ライブラリ等で公開されている中古一棟物件の取引相場感をふまえて事例を提示してください。'}${officialDealsBlock}
 
 【物件情報】
 - 所在地：${STATE.basic.pref} ${STATE.basic.city} ${STATE.basic.addr}
@@ -2496,6 +2607,7 @@ $('#btnFetchMarket').onclick = async ()=>{
       "price_man": 販売価格（万円）,
       "noi_man": 想定NOI（年・万円）,
       "gross_yield": 表面利回り（%、小数2桁）,
+      "source": "国交省公式" または "AI推定",
       "note": "備考30字以内（成約時期・特徴）"
     }
   ],
@@ -2530,12 +2642,19 @@ $('#btnFetchMarket').onclick = async ()=>{
 
     // 類似取引事例テーブル
     const deals = Array.isArray(data.comparable_deals) ? data.comparable_deals : [];
+    // STATE.market にも公式取引件数を保持しておく
+    STATE.market._official_count = officialDeals.length;
     const tbody = $('#mkDealsBody');
     if(tbody){
       if(deals.length){
         tbody.innerHTML = deals.map((d,i)=>{
           const yld = Number(d.gross_yield)||0;
+          const isOfficial = /国交省|公式|レインズ|XIT/.test(String(d.source||''));
+          const badge = isOfficial
+            ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#10b981;color:#fff;font-size:9px;font-weight:700;white-space:nowrap">国交省公式</span>'
+            : '<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#64748b;color:#fff;font-size:9px;font-weight:700;white-space:nowrap">AI推定</span>';
           return `<tr style="border-bottom:1px solid var(--line)">
+            <td style="padding:6px 8px;white-space:nowrap">${badge}</td>
             <td style="padding:6px 8px;font-weight:600">${d.label||('事例'+(i+1))}</td>
             <td style="padding:6px 8px">${d.area||'—'}</td>
             <td style="padding:6px 8px;white-space:nowrap">${d.structure||'—'}</td>
@@ -2544,18 +2663,19 @@ $('#btnFetchMarket').onclick = async ()=>{
             <td style="padding:6px 8px;text-align:right;white-space:nowrap">${(Number(d.price_man)||0).toLocaleString()} 万円</td>
             <td style="padding:6px 8px;text-align:right;white-space:nowrap">${(Number(d.noi_man)||0).toLocaleString()} 万円</td>
             <td style="padding:6px 8px;text-align:right;white-space:nowrap;background:rgba(16,185,129,0.06);font-weight:700;color:var(--green)">${yld.toFixed(2)}%</td>
-          </tr>${d.note?`<tr><td colspan="8" style="padding:2px 12px 8px;font-size:10px;color:var(--sub);border-bottom:1px solid var(--line)">└ ${d.note}</td></tr>`:''}`;
+          </tr>${d.note?`<tr><td colspan="9" style="padding:2px 12px 8px;font-size:10px;color:var(--sub);border-bottom:1px solid var(--line)">└ ${d.note}</td></tr>`:''}`;
         }).join('');
         const ylds = deals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
+        const officialCnt = deals.filter(d=>/国交省|公式|レインズ|XIT/.test(String(d.source||''))).length;
         if(ylds.length){
           const mn = Math.min(...ylds), mx = Math.max(...ylds);
           const avg = ylds.reduce((a,b)=>a+b,0)/ylds.length;
-          $('#mkDealsRange').textContent = `${mn.toFixed(2)}% 〜 ${mx.toFixed(2)}%（${ylds.length}件）`;
+          $('#mkDealsRange').textContent = `${mn.toFixed(2)}% 〜 ${mx.toFixed(2)}%（${ylds.length}件 / うち国交省公式 ${officialCnt}件）`;
           $('#mkDealsAvg').textContent = `${avg.toFixed(2)}%`;
           $('#mkDealsSummary').style.display = 'block';
         }
       }else{
-        tbody.innerHTML = '<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">類似取引事例の取得に失敗しました</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">類似取引事例の取得に失敗しました</td></tr>';
         $('#mkDealsSummary').style.display = 'none';
       }
     }
@@ -3848,10 +3968,14 @@ function buildReportHTML(){
 
     ${m ? `
     ${(Array.isArray(m.comparable_deals) && m.comparable_deals.length) ? `
-    <h2>類似取引事例（同エリア・同構造・築年類似）</h2>
+    <h2>類似取引事例（国交省XIT001＝レインズ匿名化成約データ含む）</h2>
     <table class="pdf-table" style="font-size:9px">
-      <tr><th>事例</th><th>所在エリア</th><th>構造</th><th>築年</th><th>戸数</th><th>販売価格</th><th>想定NOI</th><th>表面利回り</th></tr>
-      ${m.comparable_deals.map((d,i)=>`<tr>
+      <tr><th style="width:50px">出典</th><th>事例</th><th>所在エリア</th><th>構造</th><th>築年</th><th>戸数</th><th>販売価格</th><th>想定NOI</th><th>表面利回り</th></tr>
+      ${m.comparable_deals.map((d,i)=>{
+        const isOff = /国交省|公式|レインズ|XIT/.test(String(d.source||''));
+        const badge = isOff ? '<span style="background:#10b981;color:#fff;padding:1px 4px;border-radius:3px;font-size:8px;font-weight:700">公式</span>' : '<span style="background:#64748b;color:#fff;padding:1px 4px;border-radius:3px;font-size:8px;font-weight:700">AI</span>';
+        return `<tr>
+        <td>${badge}</td>
         <td>${d.label||('事例'+(i+1))}</td>
         <td>${d.area||'—'}</td>
         <td>${d.structure||'—'}</td>
@@ -3860,7 +3984,8 @@ function buildReportHTML(){
         <td class="num">${(Number(d.price_man)||0).toLocaleString()} 万円</td>
         <td class="num">${(Number(d.noi_man)||0).toLocaleString()} 万円</td>
         <td class="num"><b>${(Number(d.gross_yield)||0).toFixed(2)}%</b></td>
-      </tr>`).join('')}
+      </tr>`;
+      }).join('')}
     </table>
     ${(()=>{
       const ys = m.comparable_deals.map(d=>Number(d.gross_yield)||0).filter(v=>v>0);
@@ -4027,7 +4152,7 @@ function resetSimulatorForm(){
   });
   // 類似取引事例テーブルを初期メッセージに戻す
   const mkBody = $('#mkDealsBody');
-  if(mkBody) mkBody.innerHTML = '<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr>';
+  if(mkBody) mkBody.innerHTML = '<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると類似事例が表示されます</td></tr>';
   if($('#mkDealsSummary')) $('#mkDealsSummary').style.display = 'none';
   if($('#mkDealsRange')) $('#mkDealsRange').textContent = '—';
   if($('#mkDealsAvg')) $('#mkDealsAvg').textContent = '—';
