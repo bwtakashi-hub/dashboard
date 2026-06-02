@@ -302,6 +302,18 @@
   .g-edit-price{font-size:13pt;font-weight:900;color:#0ea5e9;min-width:140px}
   @media print{ .g-edit:hover, .g-edit:focus{background:transparent;box-shadow:none} }
 
+  /* ===== 物件概要書 2ページ目：写真 ===== */
+  .gaiyou-photo-sheet{width:210mm;height:297mm;background:#fff;color:#1a1a2e;padding:8mm 8mm 16mm 8mm;font-family:"Noto Sans JP",sans-serif;font-size:8pt;line-height:1.3;margin:8mm auto 0;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative;page-break-before:always}
+  .gp-grid{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:1fr;gap:3mm;margin-top:4px;overflow:hidden}
+  .gp-cell{border:1.5px solid #94a3b8;border-radius:2mm;background:#f8fafc;display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .gp-cell.gp-empty{background:#f1f5f9;border:1.5px dashed #cbd5e1;align-items:center;justify-content:center;color:#94a3b8;font-size:9pt}
+  .gp-img-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000;min-height:0}
+  .gp-img-wrap img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+  .gp-cap{padding:2px 6px;font-size:7.5pt;background:#e2e8f0;color:#0a1226;border-top:1px solid #94a3b8;text-align:center;font-weight:600;flex-shrink:0;min-height:14px}
+  .gp-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(239,68,68,0.95);color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700;line-height:18px;padding:0;z-index:2;display:flex;align-items:center;justify-content:center}
+  @media print{ .gp-remove{display:none !important} .gp-cell.gp-empty{display:none !important} .gp-grid{grid-template-columns:1fr 1fr 1fr} }
+  @media print{ .gaiyou-photo-sheet{margin:0;page-break-before:always} }
+
   @media print{
     @page{size:A4 portrait;margin:0}
     html,body{background:#fff !important;color:#000 !important;margin:0;padding:0;width:210mm;height:297mm}
@@ -1016,6 +1028,8 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
         <button class="btn btn-ghost" id="btnGaiyouAIStation" title="AI推定で最寄駅・ライフライン・周辺環境を一括取得">🤖 概要書情報を一括更新</button>
+        <button class="btn btn-orange" id="btnGaiyouPhoto" title="2ページ目の写真を追加（複数選択可）" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none">📷 写真追加</button>
+        <input type="file" id="gaiyouPhotoFile" accept="image/*" multiple class="hide" />
         <button class="btn btn-primary" id="btnGaiyouSave">💾 更新を保存</button>
         <button class="btn btn-green" id="btnGaiyouPrint" onclick="window.print()">🖨 A4印刷 / PDF保存</button>
       </div>
@@ -4865,7 +4879,113 @@ async function updateStationByAI(){
 setTimeout(()=>{
   $('#btnGaiyouSave')?.addEventListener('click', saveGaiyouOverrides);
   $('#btnGaiyouAIStation')?.addEventListener('click', updateStationByAI);
+  $('#btnGaiyouPhoto')?.addEventListener('click', ()=>$('#gaiyouPhotoFile')?.click());
+  $('#gaiyouPhotoFile')?.addEventListener('change', handleGaiyouPhotoUpload);
 }, 300);
+
+/* 概要書 写真アップロード（複数選択、1200px幅にリサイズ＋JPEG圧縮） */
+async function handleGaiyouPhotoUpload(e){
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  const sheet = document.querySelector('.gaiyou-sheet');
+  if(!sheet){ showToast('物件概要書が開かれていません','error'); return; }
+  const propId = sheet.dataset.propId;
+  const list = getPropertyList();
+  const p = list.find(x=>x.id===propId);
+  if(!p){ showToast('物件データが見つかりません','error'); return; }
+  if(!p.snapshot.gaiyouPhotos) p.snapshot.gaiyouPhotos = [];
+
+  showToast(`📷 ${files.length}枚を圧縮中…`, 'info');
+  for(const f of files){
+    try{
+      const data = await resizeImageToDataURL(f, 1200, 0.85);
+      p.snapshot.gaiyouPhotos.push({ data, caption: f.name.replace(/\.[^.]+$/,'').slice(0,30), addedAt: Date.now() });
+    }catch(err){
+      console.warn('写真処理失敗:', f.name, err.message);
+    }
+  }
+  try{
+    savePropertyList(list);
+  }catch(err){
+    // localStorage容量超過対応
+    if(err.name === 'QuotaExceededError' || /quota/i.test(err.message)){
+      showToast('⚠ ストレージ容量超過。古い写真を削除してください','error');
+      // 直前追加分をロールバック
+      p.snapshot.gaiyouPhotos.splice(-files.length, files.length);
+      return;
+    }
+    throw err;
+  }
+  // 再描画
+  $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
+  bindGaiyouEvents();
+  bindGaiyouPhotoEvents();
+  e.target.value = '';
+  showToast(`✅ ${files.length}枚追加（計${p.snapshot.gaiyouPhotos.length}枚）`,'success');
+}
+
+/* 画像を最大幅にリサイズしてJPEG DataURL化 */
+function resizeImageToDataURL(file, maxWidth, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('読込失敗'));
+    reader.onload = ev=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('画像デコード失敗'));
+      img.onload = ()=>{
+        const ratio = Math.min(1, maxWidth / img.width);
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL('image/jpeg', quality || 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* 写真ページ：削除ボタン / キャプション編集 */
+function bindGaiyouPhotoEvents(){
+  document.querySelectorAll('.gp-remove').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const idx = Number(btn.dataset.photoIdx);
+      const sheet = document.querySelector('.gaiyou-sheet');
+      if(!sheet) return;
+      const propId = sheet.dataset.propId;
+      const list = getPropertyList();
+      const p = list.find(x=>x.id===propId);
+      if(!p || !p.snapshot.gaiyouPhotos) return;
+      if(!confirm(`写真${idx+1}を削除しますか？`)) return;
+      p.snapshot.gaiyouPhotos.splice(idx, 1);
+      savePropertyList(list);
+      $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
+      bindGaiyouEvents();
+      bindGaiyouPhotoEvents();
+      showToast('🗑 写真を削除','success');
+    };
+  });
+  // キャプション編集：blur時に保存
+  document.querySelectorAll('[data-photo-cap-idx]').forEach(el=>{
+    el.onblur = ()=>{
+      const idx = Number(el.dataset.photoCapIdx);
+      const sheet = document.querySelector('.gaiyou-sheet');
+      if(!sheet) return;
+      const propId = sheet.dataset.propId;
+      const list = getPropertyList();
+      const p = list.find(x=>x.id===propId);
+      if(!p || !p.snapshot.gaiyouPhotos || !p.snapshot.gaiyouPhotos[idx]) return;
+      p.snapshot.gaiyouPhotos[idx].caption = el.textContent.trim().slice(0,40);
+      savePropertyList(list);
+    };
+  });
+}
 
 function buildGaiyouHTML(p){
   const s = p.snapshot, b = s.basic||{}, e = s.expenses||{}, r = s.result||{}, a = s.areaInfo || {};
@@ -5105,7 +5225,52 @@ function buildGaiyouHTML(p){
       ※ 本概要書は記載時点の入力データに基づく参考資料です。実取引・契約にあたっては別途正式書類をご確認ください。<br>
       株式会社 住まっぷ ／ 作成日 ${today}
     </div>
-  </div>`;
+  </div>
+  ${buildGaiyouPhotosPages(p, today, addr)}`;
+}
+
+/* 物件概要書 写真ページ生成（9枚ごと自動ページ分割） */
+function buildGaiyouPhotosPages(p, today, addr){
+  const photos = (p.snapshot && Array.isArray(p.snapshot.gaiyouPhotos)) ? p.snapshot.gaiyouPhotos : [];
+  if(!photos.length) return '';
+  const PER_PAGE = 9;
+  const pages = [];
+  for(let i=0; i<photos.length; i+=PER_PAGE){
+    pages.push(photos.slice(i, i+PER_PAGE));
+  }
+  const propName = (p.snapshot.basic && p.snapshot.basic.name) || p.name || '';
+  return pages.map((chunk, pageIdx)=>{
+    const cells = [];
+    for(let i=0; i<PER_PAGE; i++){
+      const globalIdx = pageIdx*PER_PAGE + i;
+      const photo = chunk[i];
+      if(photo){
+        cells.push(`<div class="gp-cell">
+          <button class="gp-remove" data-photo-idx="${globalIdx}" title="削除">×</button>
+          <div class="gp-img-wrap"><img src="${photo.data}" alt="写真${globalIdx+1}" /></div>
+          <div class="gp-cap"><span class="g-edit" data-photo-cap-idx="${globalIdx}" contenteditable="true" spellcheck="false">${photo.caption || ''}</span></div>
+        </div>`);
+      }else{
+        cells.push('<div class="gp-cell gp-empty">＋</div>');
+      }
+    }
+    return `<div class="gaiyou-photo-sheet" data-prop-id="${p.id}" data-photo-page="${pageIdx+1}">
+      <div class="g-header">
+        <div class="g-corp">
+          <div class="g-corp-name">株式会社 住まっぷ</div>
+          <div class="g-corp-sub">SUMAPP REAL ESTATE</div>
+        </div>
+        <div class="g-title" style="font-size:11pt;letter-spacing:.2em">物 件 写 真</div>
+        <div class="g-date">${pageIdx+1} / ${pages.length}　${today}</div>
+      </div>
+      <div class="g-title-box" style="font-size:11pt">${propName}</div>
+      <div class="g-addr-box">${addr}</div>
+      <div class="gp-grid">${cells.join('')}</div>
+      <div class="g-foot">
+        株式会社 住まっぷ ／ 物件写真 ${pageIdx+1}/${pages.length}　／　${today}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* 概要書の編集→保存 */
@@ -5137,6 +5302,8 @@ function saveGaiyouOverrides(){
 
 /* 販売価格入力 - リアルタイム円換算 + 利回り再計算 */
 function bindGaiyouEvents(){
+  // 写真イベントも合わせてバインド
+  if(typeof bindGaiyouPhotoEvents === 'function') bindGaiyouPhotoEvents();
   const priceEl = document.querySelector('.g-edit-price');
   if(!priceEl) return;
   const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
