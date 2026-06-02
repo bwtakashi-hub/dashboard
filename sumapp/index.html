@@ -793,6 +793,34 @@
       </div>
 
       <div class="card" style="margin-top:14px">
+        <h3 style="font-size:13px;color:#10b981;margin-bottom:8px">📍 近隣取引事例（国交省XIT001 生データ）</h3>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">本物件周辺<b id="nearDealsRadius">3km</b>圏内の不動産取引価格情報（<b>レインズ匿名化成約データ含む</b>）。緯度経度・取引時期・取引価格・面積・構造・築年を国交省APIから直接取得した生データを距離順に表示します。</div>
+        <div id="nearDealsMeta" style="font-size:11px;margin-bottom:6px;display:none">
+          <span style="display:inline-block;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.10);border:1px solid rgba(16,185,129,0.35);color:var(--green);font-weight:700">取得件数: <span id="nearDealsCount">0</span>件</span>
+          <span style="margin-left:8px;color:var(--sub)">／一棟物件: <span id="nearDealsAptCount">0</span>件　／構造一致: <span id="nearDealsStructCount">0</span>件　／築年近接: <span id="nearDealsYearCount">0</span>件</span>
+        </div>
+        <div style="overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:8px">
+          <table id="nearDealsTable" style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead style="position:sticky;top:0;z-index:1">
+              <tr style="background:rgba(16,185,129,0.12);border-bottom:2px solid var(--line)">
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">#</th>
+                <th style="padding:6px 8px;text-align:left">所在エリア</th>
+                <th style="padding:6px 8px;text-align:left">用途</th>
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">構造</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">築年</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">面積</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap;background:rgba(16,185,129,0.10)">取引価格</th>
+                <th style="padding:6px 8px;text-align:left;white-space:nowrap">取引時期</th>
+                <th style="padding:6px 8px;text-align:right;white-space:nowrap">距離</th>
+              </tr>
+            </thead>
+            <tbody id="nearDealsBody"><tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると国交省XIT001から近隣取引事例を取得します</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:10px;color:var(--sub);margin-top:6px">※ <b style="color:var(--green)">構造一致</b>＝対象物件と同構造（RC/SRC/木造等）／ <b style="color:var(--green)">築年近接</b>＝±10年以内。下の「類似取引事例」表ではこれらの実データを優先採用しています。</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
         <h3 style="font-size:13px;color:var(--green);margin-bottom:8px">📋 類似取引事例（同エリア・同構造・築年類似）</h3>
         <div style="font-size:11px;color:var(--sub);margin-bottom:8px">国土交通省「不動産情報ライブラリ」XIT001（<b>レインズ匿名化成約データ含む</b>）から本物件周辺の実取引を取得。不足分はAIが類似事例を推定補完。表面利回り帯を査定基準として採用します。</div>
         <div style="overflow-x:auto">
@@ -2196,6 +2224,47 @@ async function fetchTransactionDeals(lat, lon, targetStruct, targetYear, options
   return deals.slice(0, maxResults);
 }
 
+/* STEP4 近隣事例テーブル描画（国交省XIT001 生データ） */
+function renderNearDeals(deals){
+  const tbody = document.querySelector('#nearDealsBody');
+  const meta = document.querySelector('#nearDealsMeta');
+  if(!tbody) return;
+  if(!deals || !deals.length){
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">国交省XIT001 から近隣取引データを取得できませんでした（取引密度が低いエリアの可能性）</td></tr>';
+    if(meta) meta.style.display = 'none';
+    return;
+  }
+  if(meta) meta.style.display = '';
+  const aptCnt = deals.filter(d=>d._isApt).length;
+  const structCnt = deals.filter(d=>d.structMatch).length;
+  const yearCnt = deals.filter(d=>d.yearMatch).length;
+  const cntEl = document.querySelector('#nearDealsCount'); if(cntEl) cntEl.textContent = String(deals.length);
+  const aptEl = document.querySelector('#nearDealsAptCount'); if(aptEl) aptEl.textContent = String(aptCnt);
+  const stEl = document.querySelector('#nearDealsStructCount'); if(stEl) stEl.textContent = String(structCnt);
+  const yrEl = document.querySelector('#nearDealsYearCount'); if(yrEl) yrEl.textContent = String(yearCnt);
+  tbody.innerHTML = deals.map((d,i)=>{
+    const matchBadges = [];
+    if(d._isApt) matchBadges.push('<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#10b981;color:#fff;font-size:9px;font-weight:700;margin-right:2px">一棟</span>');
+    if(d.structMatch) matchBadges.push('<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#0ea5e9;color:#fff;font-size:9px;font-weight:700;margin-right:2px">構造一致</span>');
+    if(d.yearMatch) matchBadges.push('<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#f59e0b;color:#fff;font-size:9px;font-weight:700;margin-right:2px">築年近接</span>');
+    const rowBg = (d._isApt && d.structMatch && d.yearMatch) ? 'background:rgba(16,185,129,0.06)' : '';
+    return `<tr style="border-bottom:1px solid var(--line);${rowBg}">
+      <td style="padding:6px 8px;color:var(--sub);font-weight:600">${i+1}</td>
+      <td style="padding:6px 8px">
+        <div>${d.area_name||'—'}${d.district?'<span style="color:var(--sub);font-size:10px"> / '+d.district+'</span>':''}</div>
+        ${matchBadges.length?'<div style="margin-top:2px">'+matchBadges.join('')+'</div>':''}
+      </td>
+      <td style="padding:6px 8px;font-size:10px">${(d.use||'—')}${d.use_type&&d.use_type!==d.use?'<br><span style="color:var(--sub)">'+d.use_type+'</span>':''}</td>
+      <td style="padding:6px 8px;white-space:nowrap">${d.structure||'—'}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap">${d.build_year?d.build_year+'年<br><span style="color:var(--sub);font-size:10px">築'+d.age_years+'年</span>':'—'}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap">${d.land_or_floor_m2?d.land_or_floor_m2+' ㎡':'—'}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap;font-weight:700;color:var(--green)">${d.price_man.toLocaleString()} 万円</td>
+      <td style="padding:6px 8px;font-size:10px;white-space:nowrap">${d.period||'—'}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap">${d.distance_km} km</td>
+    </tr>`;
+  }).join('');
+}
+
 /* 400エラー時のリトライzoom候補 */
 const RETRY_ZOOMS = [13, 12, 14, 11, 15];
 
@@ -2553,20 +2622,28 @@ $('#btnFetchMarket').onclick = async ()=>{
     const addr = `${STATE.basic.pref}${STATE.basic.city}${STATE.basic.addr||''}`;
     const geo = await geocodeAddress(addr);
     if(geo && geo.lat && geo.lon && STATE.reinfoKey){
-      officialDeals = await fetchTransactionDeals(geo.lat, geo.lon, STATE.basic.struct, STATE.basic.year, { maxResults:10, radiusKm:3, yearTolerance:10 });
+      // STEP4近隣事例表示用には広めに30件取得、Claude渡しはその中から上位10件
+      officialDeals = await fetchTransactionDeals(geo.lat, geo.lon, STATE.basic.struct, STATE.basic.year, { maxResults:30, radiusKm:3, yearTolerance:10 });
     }
   }catch(e){ console.warn('XIT001取得失敗:', e.message); }
 
+  // STATE 保存＋近隣事例テーブル描画
+  STATE.nearDeals = officialDeals;
+  renderNearDeals(officialDeals);
+
+  // Claudeに渡すのは上位10件のみ
+  const officialDealsForAI = officialDeals.slice(0, 10);
+
   $('#aiMsg').textContent = officialDeals.length
-    ? `公式取引事例 ${officialDeals.length}件 取得 → Claude APIで利回り分析中…`
+    ? `近隣取引事例 ${officialDeals.length}件 取得 → Claude APIで利回り分析中…`
     : 'Claude APIに問い合わせ中…（公式取引データなし）';
 
   try{
-    const officialDealsBlock = officialDeals.length ? `
+    const officialDealsBlock = officialDealsForAI.length ? `
 
 【国交省「不動産情報ライブラリ」XIT001 取得実取引（レインズ匿名化成約データ含む）】
 以下は本物件周辺3km圏内の実取引データです。これらを優先的に類似事例として参照し、想定NOI・想定表面利回りを算出してください。
-${officialDeals.map((d,i)=>`${i+1}. エリア=${d.area_name}${d.district?'/'+d.district:''} | 構造=${d.structure} | 築${d.age_years||'?'}年(${d.build_year||'?'}年築) | 用途=${d.use||d.use_type} | 取引時期=${d.period} | 取引価格=${d.price_man.toLocaleString()}万円 | 面積=${d.land_or_floor_m2||'?'}㎡ | 距離=${d.distance_km}km`).join('\n')}
+${officialDealsForAI.map((d,i)=>`${i+1}. エリア=${d.area_name}${d.district?'/'+d.district:''} | 構造=${d.structure} | 築${d.age_years||'?'}年(${d.build_year||'?'}年築) | 用途=${d.use||d.use_type} | 取引時期=${d.period} | 取引価格=${d.price_man.toLocaleString()}万円 | 面積=${d.land_or_floor_m2||'?'}㎡ | 距離=${d.distance_km}km`).join('\n')}
 
 【重要】上記実取引データの収益性（想定NOI・表面利回り）を算出する際は、エリアの賃貸相場（一棟マンション/アパートの坪当たり賃料・戸あたり想定家賃）から推定し、各事例に "source": "国交省公式" を設定してください。
 ` : '';
@@ -4156,6 +4233,11 @@ function resetSimulatorForm(){
   if($('#mkDealsSummary')) $('#mkDealsSummary').style.display = 'none';
   if($('#mkDealsRange')) $('#mkDealsRange').textContent = '—';
   if($('#mkDealsAvg')) $('#mkDealsAvg').textContent = '—';
+  // 近隣事例テーブル（国交省XIT001）もクリア
+  STATE.nearDeals = [];
+  const nearBody = $('#nearDealsBody');
+  if(nearBody) nearBody.innerHTML = '<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--sub)">AI相場調査を実行すると国交省XIT001から近隣取引事例を取得します</td></tr>';
+  if($('#nearDealsMeta')) $('#nearDealsMeta').style.display = 'none';
   // STEP5 査定根拠バナーも初期化
   if($('#rsBasisDealCount')) $('#rsBasisDealCount').textContent = '—';
   if($('#rsBasisYieldRange')) $('#rsBasisYieldRange').textContent = '—';
