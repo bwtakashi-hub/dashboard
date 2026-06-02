@@ -3268,7 +3268,7 @@ function renderDriveFileSelector(files){
       </div>
       <div id="driveSelSummary" style="margin-top:10px;padding:8px;background:rgba(14,165,233,0.06);border-radius:6px;font-size:11px"></div>
       <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
-        <button class="btn btn-primary" id="btnProcessSelected">✅ 選択分のみダウンロード＆AI解析</button>
+        <button class="btn btn-primary" id="btnProcessSelected">✅ 選択分を取得 ＆ AI解析</button>
       </div>
     </div>`;
 
@@ -3298,7 +3298,7 @@ function updateDriveSummary(files){
   $('#driveSelSummary').innerHTML = `
     <b>解析対象 ${procCount}件 / 全${files.length}件</b>
     （📄謄本${counts.deed} / 🗺️資料${counts.map} / 📊RR${counts.rr} / 📑収支${counts.exp} / 🏛税${counts.tax} / ❌不要${counts.skip}）
-    <span style="color:var(--sub)">合計 ${totalMB.toFixed(1)}MB ダウンロード予定</span>`;
+    <span style="color:var(--sub)">合計 ${totalMB.toFixed(1)}MB 取得予定（ブラウザのメモリ内で完結／PCには保存されません）</span>`;
 }
 
 async function processDriveSelected(files){
@@ -3312,7 +3312,7 @@ async function processDriveSelected(files){
   if(!totalCount){ showToast('解析対象がありません（全て不要にチェックされています）','error'); return; }
 
   const log = $('#driveSelSummary');
-  log.innerHTML = `<div style="color:var(--blue)">📥 ${totalCount}件をダウンロード開始…</div>`;
+  log.innerHTML = `<div style="color:var(--blue)">📥 ${totalCount}件を取得開始…</div>`;
 
   // ダウンロード実行（タイムアウト・失敗継続・進捗ファイル名表示）
   let dlCount = 0;
@@ -3321,7 +3321,7 @@ async function processDriveSelected(files){
   for(const cat of Object.keys(selections)){
     for(const driveFile of selections[cat]){
       const failBox = failed.length ? `<div style="color:#f59e0b;font-size:11px;margin-top:4px">⚠ 失敗: ${failed.length}件（ファイル名は完了後に表示）</div>` : '';
-      log.innerHTML = `<div style="color:var(--blue)">📥 <b>${dlCount+1}/${totalCount}</b> ダウンロード中: <span style="font-family:monospace">${driveFile.name}</span> (${((Number(driveFile.size)||0)/1024).toFixed(0)}KB)</div>${failBox}`;
+      log.innerHTML = `<div style="color:var(--blue)">📥 <b>${dlCount+1}/${totalCount}</b> 取得中: <span style="font-family:monospace">${driveFile.name}</span> (${((Number(driveFile.size)||0)/1024).toFixed(0)}KB)</div>${failBox}`;
       try{
         const file = await Promise.race([
           driveDownloadFile(driveFile),
@@ -3348,7 +3348,7 @@ async function processDriveSelected(files){
       }
     }
   }
-  let summary = `<div style="color:var(--green);font-weight:700">✅ ${dlCount}/${totalCount}件 ダウンロード完了</div>`;
+  let summary = `<div style="color:var(--green);font-weight:700">✅ ${dlCount}/${totalCount}件 取得完了</div>`;
   if(failed.length){
     summary += `<div style="color:#ef4444;font-size:11px;margin-top:6px;padding:6px;border-radius:6px;background:rgba(239,68,68,0.08)">⚠ <b>${failed.length}件 失敗</b>：<br>` +
                failed.map(f=>`・${f.name} — ${f.reason}`).join('<br>') +
@@ -3356,7 +3356,7 @@ async function processDriveSelected(files){
   }
   if(dlCount === 0){
     log.innerHTML = summary + `<div style="color:#ef4444;font-weight:700;margin-top:6px">❌ 全ファイル失敗のため解析を中止します</div>`;
-    showToast('全ファイルダウンロード失敗。Drive APIキー・ファイル共有設定を確認してください','error');
+    showToast('全ファイル取得失敗。Drive APIキー・ファイル共有設定を確認してください','error');
     return;
   }
   summary += `<div style="color:var(--blue);margin-top:6px">→ AI解析を順次実行</div>`;
