@@ -595,6 +595,7 @@
     <div class="actions" style="justify-content:flex-end;margin-bottom:12px;gap:8px">
       <button class="btn btn-green" id="btnOcrRR">🤖 AIで自動入力</button>
       <button class="btn btn-primary" id="btnWebFillRR" title="空欄補完 / レントロール無ならWeb募集情報から仮作成">🔍 間取り/面積をWeb調査</button>
+      <button class="btn btn-orange" id="btnEstimateRR" title="Web情報なしでも構造・築年・延床・戸数から標準的な間取り構成を推定生成" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none">🧠 AI推定で自動生成</button>
       <button class="btn btn-ghost" id="btnSanitizeRR" title="既存の長文備考・無効URLを一括クリーンアップ">🧹 備考クリーン</button>
     </div>
     <div id="webFillResult" style="margin-bottom:12px"></div>
@@ -3536,6 +3537,98 @@ $('#btnSanitizeRR').onclick = ()=>{
     else { link.href = '#'; link.style.display = 'none'; }
   });
   showToast(`🧹 クリーン完了 — 備考整形 ${cleaned}件 / URL保持 ${urlsKept}件 / 無効URL除去 ${urlsRemoved}件`,'success');
+};
+
+/* ---------- AI推定でレントロール自動生成（Web情報不要） ---------- */
+$('#btnEstimateRR').onclick = async ()=>{
+  collectAll();
+  const b = STATE.basic;
+  if(!STATE.apiKey){ showToast('Claude APIキー未設定','error'); return; }
+  if(!b.units || b.units < 1){ showToast('STEP1で総戸数を入力してください','error'); return; }
+  if(!b.floor || b.floor < 1){ showToast('STEP1で延床面積を入力してください','error'); return; }
+
+  // 既存行確認
+  const existingRows = $$('#rrBody tr');
+  const hasData = existingRows.some(tr=>parseMoney(tr.querySelector('.rr-rent')?.value));
+  if(hasData){
+    if(!confirm('既存のレントロールを上書きしてAI推定で再生成しますか？')) return;
+  }
+
+  const out = $('#webFillResult');
+  out.innerHTML = `<div style="padding:10px;border-radius:10px;background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.35);font-size:12px;color:var(--orange)">🧠 AI推定でレントロール生成中…（構造・築年・延床・戸数・エリアから標準的な間取り構成を推定）</div>`;
+
+  try{
+    // XIT001で取得済みの近隣事例があれば賃料推定の参考に渡す
+    const nearHint = (STATE.nearDeals && STATE.nearDeals.length)
+      ? `\n【参考：近隣取引事例（国交省XIT001）】\n${STATE.nearDeals.slice(0,5).map(d=>`- ${d.area_name} | ${d.structure} | 築${d.age_years||'?'}年 | ${d.price_man.toLocaleString()}万円 | ${d.land_or_floor_m2||'?'}㎡`).join('\n')}` : '';
+
+    const avgArea = (b.floor / b.units * 0.75).toFixed(1); // 共用部25%控除
+    const prompt = `あなたは日本の収益不動産の賃貸マネジメントエキスパートです。
+以下の物件のレントロール（各戸の間取り・面積・想定賃料）を、エリア賃貸相場と築年・構造から標準的な構成で**推定生成**してください。
+※実際の入居情報がないため、Web上の賃貸募集相場・周辺類似物件の家賃帯から「妥当な想定値」を出すこと。
+
+【物件情報】
+- 物件名: ${b.name||'(不明)'}
+- 所在地: ${b.pref||''}${b.city||''}${b.addr||''}
+- 構造: ${b.struct||'(不明)'}
+- 築年: ${b.year||'(不明)'}年（築${b.year?new Date().getFullYear()-b.year:'?'}年）
+- 総戸数: ${b.units}戸
+- 延床面積: ${b.floor}㎡（平均専有 約${avgArea}㎡/戸 = 延床×0.75÷戸数）
+- 用途: 共同住宅（一棟マンション/アパート）${nearHint}
+
+【推定ルール】
+1. 全${b.units}戸分のレントロールを生成
+2. 間取り構成は築年・構造・エリアから現実的な分布で（例：築古RC50戸→1K×30+1DK×15+1LDK×5 等／築浅木造10戸→1LDK×5+2LDK×5 等）
+3. 部屋番号は階別フォーマット（101,102...201,202...）で連番、戸数÷想定階数で按分
+4. 各戸の想定賃料は **${b.pref||''}${b.city||''}エリアの相場 × 専有面積** で算出
+5. 管理費・共益費は賃料の5-8%程度（一般的相場）
+6. 全戸入居中扱い（vacancy:false）
+7. note には「AI推定」と明記
+8. 専有面積は間取りに応じて妥当な値（1K:18-25, 1DK:25-32, 1LDK:30-45, 2DK:35-50, 2LDK:45-65, 3LDK:55-80）
+
+【出力フォーマット】
+JSONのみ、前置き・解説・コードブロック装飾なし。
+
+[
+  {"no":"101","plan":"1K","area":22.5,"rent":68000,"mgmt":4000,"vacancy":false,"note":"AI推定（${b.pref||''}${b.city||''}相場ベース）"},
+  ...
+]
+
+【重要】必ず${b.units}戸ぴったり生成すること。`;
+
+    const text = await callClaude([{role:'user',content:prompt}], '', 8000);
+    const arr = extractJson(text);
+    if(!Array.isArray(arr) || !arr.length){
+      out.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);font-size:12px;color:var(--red)">❌ AI推定生成に失敗しました</div>`;
+      return;
+    }
+
+    // 既存をクリアして投入
+    $('#rrBody').innerHTML = '';
+    arr.forEach(r=>{
+      r.note = String(r.note||'AI推定').slice(0,40);
+      rrAddRow(r);
+    });
+
+    // 平均賃料・坪単価サマリ
+    const totalRent = arr.reduce((s,r)=>s+(Number(r.rent)||0),0);
+    const avgRent = Math.round(totalRent / arr.length);
+    const avgAreaRes = arr.reduce((s,r)=>s+(Number(r.area)||0),0) / arr.length;
+    const tsuboUnit = avgAreaRes>0 ? Math.round(avgRent / (avgAreaRes*0.3025)) : 0;
+
+    out.innerHTML = `
+      <div style="padding:10px 14px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.35)">
+        <div style="font-size:12px;color:var(--orange);font-weight:700">✅ AI推定レントロール生成完了 — ${arr.length}戸</div>
+        <div style="font-size:11px;color:var(--text);margin-top:4px">
+          平均賃料: <b>${avgRent.toLocaleString()}円</b> / 平均面積: <b>${avgAreaRes.toFixed(1)}㎡</b> / 賃料坪単価: <b>${tsuboUnit.toLocaleString()}円/坪</b>
+        </div>
+        <div style="font-size:11px;color:var(--red);margin-top:4px">⚠ あくまで推定値です。正式レントロール（管理会社作成）が入手できたら必ず差し替えてください。</div>
+      </div>`;
+    showToast(`✅ AI推定レントロール ${arr.length}戸 生成`,'success');
+  }catch(err){
+    out.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);font-size:12px;color:var(--red)">❌ ${err.message}</div>`;
+    showToast('AI推定生成失敗: '+err.message,'error');
+  }
 };
 
 /* ---------- 不動産ポータルWeb検索で間取り・面積を補完 ---------- */
