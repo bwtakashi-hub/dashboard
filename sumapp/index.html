@@ -3312,18 +3312,24 @@ async function processDriveSelected(files){
   if(!totalCount){ showToast('解析対象がありません（全て不要にチェックされています）','error'); return; }
 
   const log = $('#driveSelSummary');
-  log.innerHTML = `<div style="color:var(--blue)">📥 ${totalCount}件をダウンロード中…</div>`;
+  log.innerHTML = `<div style="color:var(--blue)">📥 ${totalCount}件をダウンロード開始…</div>`;
 
-  // ダウンロード実行
+  // ダウンロード実行（タイムアウト・失敗継続・進捗ファイル名表示）
   let dlCount = 0;
+  const failed = [];
+  const TIMEOUT_MS = 60000; // 60秒
   for(const cat of Object.keys(selections)){
     for(const driveFile of selections[cat]){
+      const failBox = failed.length ? `<div style="color:#f59e0b;font-size:11px;margin-top:4px">⚠ 失敗: ${failed.length}件（ファイル名は完了後に表示）</div>` : '';
+      log.innerHTML = `<div style="color:var(--blue)">📥 <b>${dlCount+1}/${totalCount}</b> ダウンロード中: <span style="font-family:monospace">${driveFile.name}</span> (${((Number(driveFile.size)||0)/1024).toFixed(0)}KB)</div>${failBox}`;
       try{
-        const file = await driveDownloadFile(driveFile);
-        if(!file) continue;
+        const file = await Promise.race([
+          driveDownloadFile(driveFile),
+          new Promise((_, rej)=>setTimeout(()=>rej(new Error('timeout 60s')), TIMEOUT_MS))
+        ]);
+        if(!file){ failed.push({name:driveFile.name, reason:'ダウンロード結果が空'}); continue; }
         STATE.files[cat] = (STATE.files[cat]||[]).concat([file]);
         dlCount++;
-        log.innerHTML = `<div style="color:var(--blue)">📥 ダウンロード中… ${dlCount}/${totalCount}</div>`;
         // 該当アップロード欄のチップ表示
         const cId = cat==='deed'?'#deedFiles':cat==='map'?'#mapFiles':cat==='rr'?'#rrFiles':cat==='exp'?'#expFiles':'#taxFiles';
         if($(cId)){
@@ -3333,11 +3339,28 @@ async function processDriveSelected(files){
           $(cId).appendChild(chip);
         }
       } catch(e){
-        console.warn('skip', driveFile.name, e);
+        const reason = (e.message || 'unknown').slice(0, 80);
+        console.warn('Drive download fail:', driveFile.name, reason);
+        failed.push({name:driveFile.name, reason});
+        // UIにエラー即時反映
+        log.innerHTML = `<div style="color:#ef4444">⚠ ${driveFile.name} 失敗（${reason}）→ 次のファイルへ進みます</div>`;
+        await new Promise(r=>setTimeout(r, 500));
       }
     }
   }
-  log.innerHTML = `<div style="color:var(--green)">✅ ${dlCount}件 ダウンロード完了 → AI解析を順次実行</div>`;
+  let summary = `<div style="color:var(--green);font-weight:700">✅ ${dlCount}/${totalCount}件 ダウンロード完了</div>`;
+  if(failed.length){
+    summary += `<div style="color:#ef4444;font-size:11px;margin-top:6px;padding:6px;border-radius:6px;background:rgba(239,68,68,0.08)">⚠ <b>${failed.length}件 失敗</b>：<br>` +
+               failed.map(f=>`・${f.name} — ${f.reason}`).join('<br>') +
+               '<br><span style="color:var(--sub)">→ 失敗ファイルは手動アップロードしてください</span></div>';
+  }
+  if(dlCount === 0){
+    log.innerHTML = summary + `<div style="color:#ef4444;font-weight:700;margin-top:6px">❌ 全ファイル失敗のため解析を中止します</div>`;
+    showToast('全ファイルダウンロード失敗。Drive APIキー・ファイル共有設定を確認してください','error');
+    return;
+  }
+  summary += `<div style="color:var(--blue);margin-top:6px">→ AI解析を順次実行</div>`;
+  log.innerHTML = summary;
 
   // 該当カテゴリのOCRを順次起動
   const hasPropFiles = selections.deed.length + selections.map.length > 0;
