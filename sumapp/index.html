@@ -3328,29 +3328,59 @@ async function shrinkImageIfNeeded(file){
 async function buildVisionContent(files, instruction, opts={}){
   const content = [{type:'text', text:instruction}];
   const usePdfToImage = opts.pdfToImage !== false;
+  const skipped = [];
   for(const f of files){
-    if(isImg(f)){
-      const shrunk = await shrinkImageIfNeeded(f);
-      const b64 = await fileToBase64(shrunk);
-      const mt = shrunk.type || 'image/jpeg';
-      content.push({type:'image', source:{type:'base64', media_type:mt, data:b64}});
-    } else if(isPdf(f)){
-      if(usePdfToImage && window.pdfjsLib){
+    try{
+      if(isImg(f)){
+        const shrunk = await shrinkImageIfNeeded(f);
+        const b64 = await fileToBase64(shrunk);
+        if(!b64 || b64.length < 100){ skipped.push({name:f.name, reason:'画像データ空'}); continue; }
+        const mt = shrunk.type || 'image/jpeg';
+        content.push({type:'image', source:{type:'base64', media_type:mt, data:b64}});
+      } else if(isPdf(f)){
+        if(!window.pdfjsLib){
+          skipped.push({name:f.name, reason:'PDF.js未読込'}); continue;
+        }
+        // 1) 暗号化チェック
         try{
-          const imgs = await pdfToImages(f);
-          for(const img of imgs){
-            const b64 = await fileToBase64(img);
-            content.push({type:'image', source:{type:'base64', media_type:img.type||'image/jpeg', data:b64}});
+          const ab = await f.arrayBuffer();
+          const head = new Uint8Array(ab.slice(0, 1024));
+          const headStr = new TextDecoder().decode(head);
+          if(!headStr.startsWith('%PDF')){
+            skipped.push({name:f.name, reason:'PDF形式でない（壊れているか別形式）'}); continue;
           }
-        }catch(e){
-          const b64 = await fileToBase64(f);
-          content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}});
+          // 暗号化PDF（/Encrypt が先頭1KBにあるとほぼ確実に暗号化）
+          if(/\/Encrypt\b/.test(headStr)){
+            skipped.push({name:f.name, reason:'暗号化PDF（パスワード解除後に再アップ）'}); continue;
+          }
+        }catch(_){}
+        // 2) 画像化
+        if(usePdfToImage){
+          try{
+            const imgs = await pdfToImages(f);
+            if(!imgs || !imgs.length){ skipped.push({name:f.name, reason:'PDFページが0枚'}); continue; }
+            for(const img of imgs){
+              const b64 = await fileToBase64(img);
+              if(!b64 || b64.length < 100){ continue; }
+              content.push({type:'image', source:{type:'base64', media_type:img.type||'image/jpeg', data:b64}});
+            }
+          }catch(e){
+            skipped.push({name:f.name, reason:'画像化失敗（'+(e.message||'').slice(0,40)+'）→ Page Snipping で画像化してアップしてください'});
+            continue;
+          }
         }
       } else {
-        const b64 = await fileToBase64(f);
-        content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}});
+        skipped.push({name:f.name, reason:'非対応形式'});
       }
+    }catch(err){
+      skipped.push({name:f.name, reason:'処理エラー: '+(err.message||'').slice(0,40)});
     }
+  }
+  if(skipped.length){
+    const msg = '⚠ ' + skipped.length + '件のファイルをスキップ：\n' +
+                skipped.map(s=>`・${s.name} — ${s.reason}`).join('\n');
+    console.warn(msg);
+    if(typeof showToast === 'function') showToast(msg, 'error');
   }
   return content;
 }
