@@ -4868,7 +4868,9 @@ function savePropertyList(list){
 let _syncDebounceTimer = null;
 let _lastSyncedHash = '';
 function _proxyUrl(){
-  return _isProxyUrl(STATE.apiKey) ? STATE.apiKey : '';
+  // 物件同期用：Claude APIキー欄がGAS URLならそれを使い、sk-ant-...形式ならデフォルトGAS URLを使う
+  if(_isProxyUrl(STATE.apiKey)) return STATE.apiKey;
+  return DEFAULT_CLAUDE_PROXY_URL || '';
 }
 async function syncPropertiesToCloud(list, opts={}){
   const url = _proxyUrl();
