@@ -1991,22 +1991,33 @@ async function callClaude(messages, system='', maxTokens=2000, temperature=undef
   if(system) body.system = system;
   // claude-opus-4-7 では temperature は deprecated のため送らない（引数は無視）
 
-  const res = await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'content-type':'application/json',
-      'x-api-key':STATE.apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify(body)
-  });
-  if(!res.ok){
-    const t = await res.text();
-    throw new Error('Claude API: '+res.status+' '+t.slice(0,200));
+  const bodyStr = JSON.stringify(body);
+  const sizeMB = bodyStr.length / 1024 / 1024;
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key':STATE.apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:bodyStr
+    });
+    if(!res.ok){
+      const t = await res.text();
+      throw new Error('Claude API: '+res.status+' '+t.slice(0,200));
+    }
+    const j = await res.json();
+    return j.content?.map(c=>c.text||'').join('') || '';
+  }catch(e){
+    // Failed to fetch（CORS/ネットワーク/ペイロード過大）を親切に解釈
+    if(/Failed to fetch|NetworkError|ERR_/.test(e.message)){
+      throw new Error(`Claude API送信失敗（ペイロード ${sizeMB.toFixed(1)}MB）：` +
+        `ファイル数を減らすかPDFを分割してください。修繕費明細など複数月分は STEP3「収支報告書」エリアへ。`);
+    }
+    throw e;
   }
-  const j = await res.json();
-  return j.content?.map(c=>c.text||'').join('') || '';
 }
 
 /* Web検索ツール対応版：text + 引用URL一覧を返す */
@@ -3521,6 +3532,21 @@ async function buildVisionContent(files, instruction, opts={}){
   const content = [{type:'text', text:instruction}];
   const usePdfToImage = opts.pdfToImage !== false;
   const skipped = [];
+  // 事前ペイロードサイズ警告（合計15MB超なら警告）
+  const totalSize = files.reduce((s,f)=>s+(f.size||0), 0);
+  const totalMB = totalSize / 1024 / 1024;
+  if(totalMB > 15){
+    const proceed = confirm(`⚠ アップロードファイル合計 ${totalMB.toFixed(1)}MB（${files.length}ファイル）\n\n` +
+      `Claude APIは PDF を画像化して送信するため、実際の送信サイズは数倍に膨らみます。\n` +
+      `30MB前後で「Failed to fetch」エラーが多発します。\n\n` +
+      `※ おすすめ：\n` +
+      `・修繕費明細など多数のPDFは STEP3「収支報告書」へ分けて投入\n` +
+      `・物件資料は3〜5ファイルに絞る\n\n` +
+      `このまま実行しますか？（OKで続行 / キャンセルで中止）`);
+    if(!proceed){
+      throw new Error(`ユーザーがキャンセルしました（合計${totalMB.toFixed(1)}MB）`);
+    }
+  }
   for(const f of files){
     try{
       if(isImg(f)){
