@@ -351,7 +351,7 @@
     </nav>
     <div class="api-panel">
       <span class="pill" id="apiStatus">Claude: 未設定</span>
-      <input type="password" id="apiKey" placeholder="Claude API Key" autocomplete="off" style="width:160px;font-family:monospace;font-size:11px" />
+      <input type="password" id="apiKey" placeholder="Claude API Key または GASプロキシURL" autocomplete="off" style="width:200px;font-family:monospace;font-size:11px" title="sk-ant-... 形式の個人キー、または GASプロキシのWebアプリURL（共通利用推奨）" />
       <span class="pill" id="driveStatus">Drive: 未設定</span>
       <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px" />
       <span class="pill" id="reinfoStatus">不動産Lib: 未設定</span>
@@ -1185,9 +1185,10 @@ function showToast(msg, type='info'){
 
 /* ---------- API Key ---------- */
 function refreshApiStatus(){
-  const ok = !!STATE.apiKey && STATE.apiKey.startsWith('sk-ant');
+  const ok = !!STATE.apiKey && (STATE.apiKey.startsWith('sk-ant') || /^https?:\/\//.test(STATE.apiKey));
+  const isProxy = STATE.apiKey && /^https?:\/\//.test(STATE.apiKey);
   const el = $('#apiStatus');
-  el.textContent = ok ? 'Claude: 設定済' : 'Claude: 未設定';
+  el.textContent = ok ? (isProxy ? 'Claude: プロキシ経由' : 'Claude: 設定済') : 'Claude: 未設定';
   el.className = 'pill ' + (ok?'green':'red');
 
   const dok = !!STATE.driveKey && STATE.driveKey.length > 10;
@@ -2152,9 +2153,13 @@ $('#btnRecalc').onclick = recalc;
 /* =========================================================
  *  Claude API Integration
  * ========================================================= */
+/* Claude API キーが「URL形式」ならGASプロキシ経由、「sk-ant-」なら直接 */
+function _isProxyUrl(s){ return s && /^https?:\/\//.test(s); }
+
 async function callClaude(messages, system='', maxTokens=2000, temperature=undefined){
-  if(!STATE.apiKey || !STATE.apiKey.startsWith('sk-ant')){
-    throw new Error('APIキーが未設定です。画面上部から登録してください。');
+  const useProxy = _isProxyUrl(STATE.apiKey);
+  if(!STATE.apiKey || (!useProxy && !STATE.apiKey.startsWith('sk-ant'))){
+    throw new Error('Claude APIキーまたはGASプロキシURLが未設定です。');
   }
   const body = {
     model:'claude-opus-4-7',
@@ -2162,32 +2167,45 @@ async function callClaude(messages, system='', maxTokens=2000, temperature=undef
     messages
   };
   if(system) body.system = system;
-  // claude-opus-4-7 では temperature は deprecated のため送らない（引数は無視）
 
   const bodyStr = JSON.stringify(body);
   const sizeMB = bodyStr.length / 1024 / 1024;
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'content-type':'application/json',
-        'x-api-key':STATE.apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:bodyStr
-    });
+    let res;
+    if(useProxy){
+      // GASプロキシ経由（APIキーはGAS側のスクリプトプロパティで保持）
+      res = await fetch(STATE.apiKey,{
+        method:'POST',
+        headers:{ 'content-type':'application/json' },
+        body:bodyStr,
+        redirect:'follow'
+      });
+    } else {
+      // 直接 Claude API
+      res = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'content-type':'application/json',
+          'x-api-key':STATE.apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:bodyStr
+      });
+    }
     if(!res.ok){
       const t = await res.text();
       throw new Error('Claude API: '+res.status+' '+t.slice(0,200));
     }
     const j = await res.json();
+    if(j.error){
+      throw new Error('Claude API: '+(j.error.message||JSON.stringify(j.error)).slice(0,200));
+    }
     return j.content?.map(c=>c.text||'').join('') || '';
   }catch(e){
-    // Failed to fetch（CORS/ネットワーク/ペイロード過大）を親切に解釈
     if(/Failed to fetch|NetworkError|ERR_/.test(e.message)){
       throw new Error(`Claude API送信失敗（ペイロード ${sizeMB.toFixed(1)}MB）：` +
-        `ファイル数を減らすかPDFを分割してください。修繕費明細など複数月分は STEP3「収支報告書」エリアへ。`);
+        `ファイル数を減らすかPDFを分割してください。`);
     }
     throw e;
   }
@@ -2195,8 +2213,9 @@ async function callClaude(messages, system='', maxTokens=2000, temperature=undef
 
 /* Web検索ツール対応版：text + 引用URL一覧を返す */
 async function callClaudeWithSearch(messages, system='', maxTokens=4000, maxSearches=5){
-  if(!STATE.apiKey || !STATE.apiKey.startsWith('sk-ant')){
-    throw new Error('APIキーが未設定です。');
+  const useProxy = _isProxyUrl(STATE.apiKey);
+  if(!STATE.apiKey || (!useProxy && !STATE.apiKey.startsWith('sk-ant'))){
+    throw new Error('Claude APIキーまたはGASプロキシURLが未設定です。');
   }
   const body = {
     model:'claude-opus-4-7',
@@ -2210,16 +2229,23 @@ async function callClaudeWithSearch(messages, system='', maxTokens=4000, maxSear
   };
   if(system) body.system = system;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'content-type':'application/json',
-      'x-api-key':STATE.apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify(body)
-  });
+  const res = useProxy
+    ? await fetch(STATE.apiKey,{
+        method:'POST',
+        headers:{ 'content-type':'application/json' },
+        body:JSON.stringify(body),
+        redirect:'follow'
+      })
+    : await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'content-type':'application/json',
+          'x-api-key':STATE.apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify(body)
+      });
   if(!res.ok){
     const t = await res.text();
     throw new Error('Claude API: '+res.status+' '+t.slice(0,300));
