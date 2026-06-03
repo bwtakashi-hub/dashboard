@@ -994,10 +994,11 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div>
-          <h2>📋 物件登録一覧</h2>
-          <p class="desc" style="margin:4px 0 0">登録された物件の一覧。編集・複製・物件概要書作成・削除が行えます。</p>
+          <h2>📋 物件登録一覧 <span id="cloudSyncStatus" style="font-size:11px;font-weight:400;color:var(--sub);margin-left:10px">☁ 未同期</span></h2>
+          <p class="desc" style="margin:4px 0 0">登録された物件の一覧。<b style="color:var(--green)">編集は自動的に全PCへ同期</b>されます（GASプロキシ経由）。</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="btnCloudSync" title="クラウド（Drive）から最新を強制取得">🔄 同期</button>
           <button class="btn btn-ghost" id="btnSeedSample" title="サンプル物件「アジュール目黒」を登録">📥 サンプル登録</button>
           <button class="btn btn-primary" id="btnNewProperty">＋ 新規物件作成</button>
         </div>
@@ -4852,8 +4853,120 @@ function getPropertyList(){
   try{ return JSON.parse(localStorage.getItem(PROPLIST_KEY)||'[]'); }catch(e){ return []; }
 }
 function savePropertyList(list){
+  // 各物件にupdatedAt（最終更新時刻）をセット（マージ時の判定用）
+  const now = Date.now();
+  list.forEach(p => { if(!p.updatedAt) p.updatedAt = now; });
   localStorage.setItem(PROPLIST_KEY, JSON.stringify(list));
+  // Driveへ自動同期（GASプロキシURLが設定されている場合）
+  if(typeof syncPropertiesToCloud === 'function') {
+    syncPropertiesToCloud(list).catch(()=>{});
+  }
 }
+
+/* ===== Drive同期：GASプロキシ経由で物件一覧をクラウド保存 =====
+   URL 同期 = 全PCで共通の物件マスタを共有 */
+let _syncDebounceTimer = null;
+let _lastSyncedHash = '';
+function _proxyUrl(){
+  return _isProxyUrl(STATE.apiKey) ? STATE.apiKey : '';
+}
+async function syncPropertiesToCloud(list, opts={}){
+  const url = _proxyUrl();
+  if(!url) return;
+  // 直近の同期内容と同じならスキップ
+  const json = JSON.stringify(list);
+  if(json === _lastSyncedHash && !opts.force) return;
+  // デバウンス：連続編集時は最後の1回だけ送信
+  if(_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+  _syncDebounceTimer = setTimeout(async ()=>{
+    try{
+      const sep = url.includes('?') ? '&' : '?';
+      const res = await fetch(url + sep + 'action=save_properties', {
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body: json,
+        redirect:'follow'
+      });
+      if(res.ok){
+        _lastSyncedHash = json;
+        _updateSyncIndicator('synced', new Date());
+      } else {
+        _updateSyncIndicator('error');
+      }
+    }catch(e){
+      _updateSyncIndicator('error');
+      console.warn('cloud sync failed:', e.message);
+    }
+  }, 1500);
+}
+async function loadPropertiesFromCloud(){
+  const url = _proxyUrl();
+  if(!url) return null;
+  try{
+    _updateSyncIndicator('syncing');
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(url + sep + 'action=list_properties', {redirect:'follow'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const arr = await res.json();
+    if(!Array.isArray(arr)) throw new Error('invalid format');
+    _lastSyncedHash = JSON.stringify(arr);
+    _updateSyncIndicator('synced', new Date());
+    return arr;
+  }catch(e){
+    _updateSyncIndicator('error');
+    console.warn('cloud load failed:', e.message);
+    return null;
+  }
+}
+function _updateSyncIndicator(state, time){
+  const el = document.querySelector('#cloudSyncStatus');
+  if(!el) return;
+  const t = time ? time.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : '';
+  if(state === 'synced'){
+    el.textContent = `☁ 同期済 ${t}`;
+    el.style.color = 'var(--green)';
+  } else if(state === 'syncing'){
+    el.textContent = '☁ 同期中…';
+    el.style.color = 'var(--blue)';
+  } else {
+    el.textContent = '☁ 同期エラー';
+    el.style.color = 'var(--red)';
+  }
+}
+
+/* 起動時：Driveから物件一覧を取得して localStorage を上書き
+   ※ ローカル変更がある場合は確認 */
+(async ()=>{
+  // GASプロキシURLが設定されてから少し待つ
+  await new Promise(r=>setTimeout(r, 1500));
+  const remoteList = await loadPropertiesFromCloud();
+  if(!remoteList) return;
+  const localList = getPropertyList();
+  if(localList.length === 0 && remoteList.length > 0){
+    // ローカル空 → クラウドを反映
+    localStorage.setItem(PROPLIST_KEY, JSON.stringify(remoteList));
+    showToast(`☁ クラウドから ${remoteList.length}件 の物件を読込`, 'success');
+    if(typeof renderPropertyList === 'function') renderPropertyList();
+  } else if(localList.length > 0 && remoteList.length > 0){
+    // 両方データあり → IDベースでマージ（最新updated優先）
+    const map = new Map();
+    [...remoteList, ...localList].forEach(p=>{
+      const existing = map.get(p.id);
+      if(!existing || (p.updatedAt && (!existing.updatedAt || p.updatedAt > existing.updatedAt))){
+        map.set(p.id, p);
+      }
+    });
+    const merged = Array.from(map.values());
+    if(merged.length !== localList.length){
+      localStorage.setItem(PROPLIST_KEY, JSON.stringify(merged));
+      showToast(`☁ クラウドと同期：${merged.length}件 (前${localList.length}件)`, 'info');
+      if(typeof renderPropertyList === 'function') renderPropertyList();
+    }
+  } else if(localList.length > 0 && remoteList.length === 0){
+    // クラウド空 → ローカルをアップ
+    syncPropertiesToCloud(localList, {force:true});
+  }
+})();
 function buildSnapshot(){
   collectAll();
   if(!STATE.result) STATE.result = calcAll();
@@ -5035,6 +5148,17 @@ setTimeout(()=>{
   $('#btnGaiyou')?.addEventListener('click', ()=>{
     const entry = saveCurrentProperty();
     if(entry) openGaiyou(entry.id);
+  });
+  $('#btnCloudSync')?.addEventListener('click', async ()=>{
+    showToast('☁ クラウドから最新を取得中…','info');
+    const remote = await loadPropertiesFromCloud();
+    if(remote){
+      localStorage.setItem(PROPLIST_KEY, JSON.stringify(remote));
+      if(typeof renderPropertyList === 'function') renderPropertyList();
+      showToast(`✅ ${remote.length}件 取得完了`,'success');
+    } else {
+      showToast('❌ 取得失敗（プロキシURL未設定または通信エラー）','error');
+    }
   });
   $('#btnNewProperty')?.addEventListener('click', ()=>{
     STATE.currentPropertyId = '';
