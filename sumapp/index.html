@@ -12,6 +12,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
 <script>
   if(window['pdfjsLib']){
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -354,6 +356,11 @@
       <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px" />
       <span class="pill" id="reinfoStatus">不動産Lib: 未設定</span>
       <input type="password" id="reinfoKey" placeholder="GASプロキシURL or 不動産Lib APIキー" autocomplete="off" style="width:240px;font-family:monospace;font-size:11px" title="GASプロキシのWebアプリURL（推奨）または不動産情報ライブラリのAPIキー（CORS未対応）" />
+      <span class="pill" id="oauthStatus">Drive OAuth: 未ログイン</span>
+      <input type="password" id="oauthClientId" placeholder="OAuth Client ID（.apps.googleusercontent.com）" autocomplete="off" style="width:200px;font-family:monospace;font-size:11px" title="Google Cloud Console で作成した Web OAuth クライアントID" />
+      <button class="btn btn-ghost" id="googleSignIn" style="padding:6px 10px;font-size:11px;background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border:none" title="Googleアカウントでログイン → Driveの組織共有ファイルも取得可能に">🔐 Googleログイン</button>
+      <button class="btn btn-ghost" id="googleSignOut" style="padding:6px 8px;font-size:11px;display:none" title="ログアウト">🚪</button>
+      <button class="btn btn-ghost" id="drivePicker" style="padding:6px 10px;font-size:11px;display:none;background:linear-gradient(135deg,#0f9d58,#ffc107);color:#fff;border:none" title="Drive Picker（ログイン後に有効）">📂 Driveから選ぶ</button>
       <button class="btn btn-ghost" id="saveKey" style="padding:6px 10px;font-size:11px">保存</button>
       <button class="btn btn-ghost" id="toggleKey" style="padding:6px 8px;font-size:11px" title="表示/非表示">👁</button>
       <button class="btn btn-ghost" id="exportKeys" style="padding:6px 8px;font-size:11px" title="3つのAPIキーをクリップボードへエクスポート（別PC移行用）">📤</button>
@@ -1139,6 +1146,9 @@ const STATE = {
   apiKey: safeStorage.getSync('claude_api_key'),
   driveKey: safeStorage.getSync('drive_api_key'),
   reinfoKey: safeStorage.getSync('reinfo_api_key'),
+  oauthClientId: safeStorage.getSync('oauth_client_id'),
+  oauthToken: '',           // in-memory only（セッション中のみ保持、永続化しない）
+  oauthExpiresAt: 0,
   step: 1,
   basic: {},
   rentRoll: [],
@@ -1221,8 +1231,166 @@ refreshApiStatus();
   if(!STATE.apiKey){    const v = await safeStorage.get('claude_api_key'); if(v){ STATE.apiKey = v; if($('#apiKey')) $('#apiKey').value = v; changed = true; } }
   if(!STATE.driveKey){  const v = await safeStorage.get('drive_api_key'); if(v){ STATE.driveKey = v; if($('#driveKey')) $('#driveKey').value = v; changed = true; } }
   if(!STATE.reinfoKey){ const v = await safeStorage.get('reinfo_api_key'); if(v){ STATE.reinfoKey = v; if($('#reinfoKey')) $('#reinfoKey').value = v; changed = true; } }
+  if(!STATE.oauthClientId){ const v = await safeStorage.get('oauth_client_id'); if(v){ STATE.oauthClientId = v; if($('#oauthClientId')) $('#oauthClientId').value = v; changed = true; } }
   if(changed){ refreshApiStatus(); showToast('🔓 IndexedDBから保存済APIキーを復元しました','success'); }
+  if(STATE.oauthClientId && $('#oauthClientId')) $('#oauthClientId').value = STATE.oauthClientId;
 })();
+
+/* ===== Google OAuth 2.0（Drive Picker + 認証API呼び出し） =====
+   組織共有Drive（要ログイン設定）でも取得可能になる */
+let _tokenClient = null;
+function _initGoogleAuth(){
+  if(!STATE.oauthClientId){
+    showToast('先にOAuth Client ID を入力して保存してください（画面右上）','error');
+    return false;
+  }
+  if(typeof google === 'undefined' || !google.accounts?.oauth2){
+    showToast('Google Identity Services 未ロード（数秒待って再試行）','error');
+    return false;
+  }
+  if(!_tokenClient){
+    _tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: STATE.oauthClientId,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: (resp)=>{
+        if(resp.access_token){
+          STATE.oauthToken = resp.access_token;
+          STATE.oauthExpiresAt = Date.now() + (resp.expires_in || 3600) * 1000;
+          _refreshOauthStatus();
+          showToast('✅ Driveへのアクセス許可を取得しました','success');
+        } else {
+          showToast('❌ OAuth認証失敗','error');
+        }
+      },
+      error_callback: (err)=>{
+        showToast('❌ OAuth エラー: '+(err.type||'unknown'),'error');
+      }
+    });
+  }
+  return true;
+}
+function _refreshOauthStatus(){
+  const el = $('#oauthStatus');
+  if(!el) return;
+  const valid = STATE.oauthToken && Date.now() < STATE.oauthExpiresAt;
+  el.textContent = valid ? 'Drive OAuth: 認証済' : 'Drive OAuth: 未ログイン';
+  el.className = 'pill ' + (valid ? 'green' : 'red');
+  const signInBtn = $('#googleSignIn');
+  const signOutBtn = $('#googleSignOut');
+  const pickerBtn = $('#drivePicker');
+  if(signInBtn) signInBtn.style.display = valid ? 'none' : '';
+  if(signOutBtn) signOutBtn.style.display = valid ? '' : 'none';
+  if(pickerBtn) pickerBtn.style.display = valid ? '' : 'none';
+}
+function isOauthValid(){
+  return STATE.oauthToken && Date.now() < STATE.oauthExpiresAt - 30000;
+}
+async function ensureOauthToken(){
+  if(isOauthValid()) return STATE.oauthToken;
+  // 無音再ログイン試行（既にユーザーが許可済みなら無操作で成功）
+  if(_initGoogleAuth()){
+    return new Promise((res, rej)=>{
+      const oldCb = _tokenClient.callback;
+      _tokenClient.callback = (resp)=>{
+        oldCb(resp);
+        if(resp.access_token) res(resp.access_token);
+        else rej(new Error('token取得失敗'));
+      };
+      _tokenClient.requestAccessToken({ prompt: '' });
+      setTimeout(()=>rej(new Error('OAuth timeout')), 10000);
+    });
+  }
+  return '';
+}
+
+setTimeout(()=>{
+  $('#oauthClientId')?.addEventListener('change', async (e)=>{
+    STATE.oauthClientId = e.target.value.trim();
+    await safeStorage.set('oauth_client_id', STATE.oauthClientId);
+    _tokenClient = null; // 再初期化
+    showToast('OAuth Client ID を保存しました','success');
+  });
+  $('#googleSignIn')?.addEventListener('click', ()=>{
+    if(!_initGoogleAuth()) return;
+    _tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+  $('#googleSignOut')?.addEventListener('click', ()=>{
+    if(STATE.oauthToken && google?.accounts?.oauth2){
+      google.accounts.oauth2.revoke(STATE.oauthToken, ()=>{});
+    }
+    STATE.oauthToken = '';
+    STATE.oauthExpiresAt = 0;
+    _refreshOauthStatus();
+    showToast('ログアウトしました','info');
+  });
+  $('#drivePicker')?.addEventListener('click', ()=>openDrivePicker());
+  _refreshOauthStatus();
+}, 300);
+
+/* ===== Drive Picker（OAuth後にDrive内ファイルを選択取込） ===== */
+let _pickerApiLoaded = false;
+function _loadPickerApi(){
+  return new Promise((res)=>{
+    if(_pickerApiLoaded) return res();
+    if(typeof gapi === 'undefined'){
+      const wait = setInterval(()=>{
+        if(typeof gapi !== 'undefined'){
+          clearInterval(wait);
+          gapi.load('picker', ()=>{ _pickerApiLoaded = true; res(); });
+        }
+      }, 200);
+      setTimeout(()=>clearInterval(wait), 10000);
+    } else {
+      gapi.load('picker', ()=>{ _pickerApiLoaded = true; res(); });
+    }
+  });
+}
+async function openDrivePicker(){
+  if(!isOauthValid()){
+    showToast('先に「🔐 Googleログイン」してください','error');
+    return;
+  }
+  await _loadPickerApi();
+  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setMimeTypes('application/pdf,image/jpeg,image/png,image/jpg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    .setSelectFolderEnabled(false);
+  const sharedView = new google.picker.DocsView(google.picker.ViewId.DOCS).setOwnedByMe(false).setIncludeFolders(true);
+  const picker = new google.picker.PickerBuilder()
+    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+    .setOAuthToken(STATE.oauthToken)
+    .setAppId(STATE.oauthClientId.split('-')[0])
+    .addView(view)
+    .addView(sharedView)
+    .setTitle('Driveからファイルを選択（複数可）')
+    .setCallback(async (data)=>{
+      if(data.action !== google.picker.Action.PICKED) return;
+      const docs = data.docs || [];
+      if(!docs.length) return;
+      showToast(`📥 ${docs.length}件を取得中…`,'info');
+      const targetCategory = prompt('取込先カテゴリを選んでください：\ndeed=謄本/公図\nmap=物件資料\nrr=レントロール\nexp=収支報告書\ntax=固定資産税','map');
+      if(!targetCategory) return;
+      const cId = targetCategory==='deed'?'#deedFiles':targetCategory==='map'?'#mapFiles':targetCategory==='rr'?'#rrFiles':targetCategory==='exp'?'#expFiles':'#taxFiles';
+      let ok = 0;
+      for(const d of docs){
+        try{
+          const file = await driveDownloadFile({id:d.id, name:d.name, mimeType:d.mimeType, size:d.sizeBytes});
+          if(!file) continue;
+          STATE.files[targetCategory] = (STATE.files[targetCategory]||[]).concat([file]);
+          if($(cId)){
+            const chip = document.createElement('span');
+            chip.className = 'file-chip';
+            chip.innerHTML = `📎 ${d.name} <span style="color:var(--sub)">(${(file.size/1024).toFixed(0)}KB)</span>`;
+            $(cId).appendChild(chip);
+          }
+          ok++;
+        }catch(e){ console.warn('picker download fail', d.name, e); }
+      }
+      showToast(`✅ ${ok}/${docs.length}件 取込完了`,'success');
+    })
+    .build();
+  picker.setVisible(true);
+}
 
 /* ===== APIキー エクスポート/インポート（PC間移行用） ===== */
 window.exportApiKeys = function(){
@@ -3186,10 +3354,14 @@ function parseDriveFolderId(url){
 }
 
 async function driveListFolder(folderId){
-  if(!STATE.driveKey) throw new Error('Google Drive APIキーが未設定です。画面右上から登録してください。');
+  // OAuthトークンがあれば優先、なければAPIキー
+  const useOauth = isOauthValid();
+  if(!useOauth && !STATE.driveKey) throw new Error('Google Drive APIキーまたは🔐 Googleログインが必要です。');
   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size)&pageSize=200&key=${STATE.driveKey}`;
-  const res = await fetch(url);
+  const baseUrl = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size)&pageSize=200`;
+  const url = useOauth ? baseUrl : baseUrl + `&key=${STATE.driveKey}`;
+  const headers = useOauth ? {'Authorization': `Bearer ${STATE.oauthToken}`} : {};
+  const res = await fetch(url, { headers });
   if(!res.ok){
     const t = await res.text();
     throw new Error(`Drive API ${res.status}: ${t.slice(0,200)}`);
@@ -3199,19 +3371,28 @@ async function driveListFolder(folderId){
 }
 
 async function driveDownloadFile(file){
-  // Google Docs/Sheets等のWeb文書はexportが必要、通常ファイルはalt=media
+  // OAuth優先（組織共有・要ログイン設定にも対応）
+  const useOauth = isOauthValid();
+  if(!useOauth && !STATE.driveKey) throw new Error('Google Drive APIキーまたはOAuth認証が必要です。');
   const isGoogleDoc = file.mimeType.startsWith('application/vnd.google-apps.');
   let url;
   if(isGoogleDoc){
     if(file.mimeType === 'application/vnd.google-apps.spreadsheet'){
-      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/csv&key=${STATE.driveKey}`;
+      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/csv`;
     } else if(file.mimeType === 'application/vnd.google-apps.document'){
-      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=application/pdf&key=${STATE.driveKey}`;
+      url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=application/pdf`;
     } else return null;
   } else {
-    url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${STATE.driveKey}`;
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
   }
-  const res = await fetch(url);
+  // OAuthはBearer、APIキーはURLパラメータ
+  let headers = {};
+  if(useOauth){
+    headers = {'Authorization': `Bearer ${STATE.oauthToken}`};
+  } else {
+    url += (url.includes('?') ? '&' : '?') + `key=${STATE.driveKey}`;
+  }
+  const res = await fetch(url, { headers });
   if(!res.ok) throw new Error(`ダウンロード失敗 ${file.name}: ${res.status}`);
   const blob = await res.blob();
   // mimeを補正
