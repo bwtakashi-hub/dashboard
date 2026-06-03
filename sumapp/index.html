@@ -357,7 +357,7 @@
       <span class="pill" id="reinfoStatus">不動産Lib: 未設定</span>
       <input type="password" id="reinfoKey" placeholder="GASプロキシURL or 不動産Lib APIキー" autocomplete="off" style="width:240px;font-family:monospace;font-size:11px" title="GASプロキシのWebアプリURL（推奨）または不動産情報ライブラリのAPIキー（CORS未対応）" />
       <span class="pill" id="oauthStatus">Drive OAuth: 未ログイン</span>
-      <input type="password" id="oauthClientId" placeholder="OAuth Client ID（.apps.googleusercontent.com）" autocomplete="off" style="width:200px;font-family:monospace;font-size:11px" title="Google Cloud Console で作成した Web OAuth クライアントID" />
+      <input type="text" id="oauthClientId" placeholder="OAuth Client ID（既定値設定済 / 変更時のみ入力）" autocomplete="off" style="width:200px;font-family:monospace;font-size:10px;opacity:0.5" title="Google Cloud Console で作成した Web OAuth クライアントID（既定値設定済）" />
       <button class="btn btn-ghost" id="googleSignIn" style="padding:6px 10px;font-size:11px;background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border:none" title="Googleアカウントでログイン → Driveの組織共有ファイルも取得可能に">🔐 Googleログイン</button>
       <button class="btn btn-ghost" id="googleSignOut" style="padding:6px 8px;font-size:11px;display:none" title="ログアウト">🚪</button>
       <button class="btn btn-ghost" id="drivePicker" style="padding:6px 10px;font-size:11px;display:none;background:linear-gradient(135deg,#0f9d58,#ffc107);color:#fff;border:none" title="Drive Picker（ログイン後に有効）">📂 Driveから選ぶ</button>
@@ -1142,11 +1142,15 @@ const safeStorage = (function(){
   };
 })();
 
+/* OAuth Client ID（公開情報 — 承認済みオリジン制限で保護）
+   ※ アプリ全PCで共通利用するため埋め込み済み */
+const DEFAULT_OAUTH_CLIENT_ID = '1082070115100-kbl92vt9uhbn0vre4d5voebnubank8cr.apps.googleusercontent.com';
+
 const STATE = {
   apiKey: safeStorage.getSync('claude_api_key'),
   driveKey: safeStorage.getSync('drive_api_key'),
   reinfoKey: safeStorage.getSync('reinfo_api_key'),
-  oauthClientId: safeStorage.getSync('oauth_client_id'),
+  oauthClientId: safeStorage.getSync('oauth_client_id') || DEFAULT_OAUTH_CLIENT_ID,
   oauthToken: '',           // in-memory only（セッション中のみ保持、永続化しない）
   oauthExpiresAt: 0,
   step: 1,
@@ -1199,6 +1203,7 @@ function refreshApiStatus(){
   }
 }
 $('#apiKey').value = STATE.apiKey;
+if($('#oauthClientId')) $('#oauthClientId').value = STATE.oauthClientId;
 $('#driveKey').value = STATE.driveKey;
 if($('#reinfoKey')) $('#reinfoKey').value = STATE.reinfoKey;
 $('#toggleKey').onclick = ()=>{
