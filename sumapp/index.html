@@ -1146,8 +1146,12 @@ const safeStorage = (function(){
    ※ アプリ全PCで共通利用するため埋め込み済み */
 const DEFAULT_OAUTH_CLIENT_ID = '1082070115100-kbl92vt9uhbn0vre4d5voebnubank8cr.apps.googleusercontent.com';
 
+/* Claude API デフォルトプロキシURL（GAS Webアプリ）
+   ※ GAS側でCLAUDE_API_KEY秘匿、アプリ全PCで共通利用するため埋め込み済み */
+const DEFAULT_CLAUDE_PROXY_URL = 'https://script.google.com/macros/s/AKfycbw-XVYFUJtvOH1zFwrix1RemMO2LSCW-NeJzdvxnC5B-taDhV1FVuxFgmygJ2pSwSbZAw/exec';
+
 const STATE = {
-  apiKey: safeStorage.getSync('claude_api_key'),
+  apiKey: safeStorage.getSync('claude_api_key') || DEFAULT_CLAUDE_PROXY_URL,
   driveKey: safeStorage.getSync('drive_api_key'),
   reinfoKey: safeStorage.getSync('reinfo_api_key'),
   oauthClientId: safeStorage.getSync('oauth_client_id') || DEFAULT_OAUTH_CLIENT_ID,
