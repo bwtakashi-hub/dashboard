@@ -1003,6 +1003,14 @@
           <button class="btn btn-primary" id="btnNewProperty">＋ 新規物件作成</button>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="position:relative;flex:1;min-width:280px;max-width:520px">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:14px">🔍</span>
+          <input type="text" id="propSearchInput" placeholder="物件名・所在地・種別・構造で検索（例: 大町台、目黒、RC）" autocomplete="off" style="width:100%;padding:10px 14px 10px 36px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);color:var(--text);font-size:13px" />
+          <button id="propSearchClear" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--sub);cursor:pointer;font-size:14px;padding:4px 8px;display:none" title="クリア">✕</button>
+        </div>
+        <span id="propSearchCount" style="font-size:11px;color:var(--sub)"></span>
+      </div>
       <div style="overflow-x:auto">
         <table class="prop-table" id="propTable">
           <thead>
@@ -5105,13 +5113,31 @@ function renderPropertyList(){
   const list = getPropertyList();
   const tbody = $('#propTableBody');
   const empty = $('#propEmpty');
+  const cntEl = $('#propSearchCount');
   if(!list.length){
     tbody.innerHTML='';
     empty.style.display='block';
+    if(cntEl) cntEl.textContent='';
     return;
   }
   empty.style.display='none';
-  tbody.innerHTML = list.map((p,i)=>{
+  // フリーワード検索フィルタ（物件名・所在地・種別・構造で部分一致、大文字小文字無視）
+  const q = ($('#propSearchInput')?.value || '').trim().toLowerCase();
+  const filtered = q
+    ? list.filter(p => {
+        const shubetsu = p.snapshot?.basic?.propertyType || p.snapshot?.gaiyouOverride?.shubetsu || '一棟マンション/アパート';
+        const haystack = [p.name, p.addr, p.struct, shubetsu, String(p.year||''), String(p.units||'')].join(' ').toLowerCase();
+        return q.split(/\s+/).every(token => haystack.includes(token));
+      })
+    : list;
+  if(cntEl){
+    cntEl.textContent = q ? `${filtered.length} / ${list.length}件` : `全 ${list.length}件`;
+  }
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--sub)">🔍 「${q}」に該当する物件がありません</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map((p,i)=>{
     const updated = new Date(p.updatedAt).toLocaleString('ja-JP');
     const shubetsu = p.snapshot?.basic?.propertyType || p.snapshot?.gaiyouOverride?.shubetsu || '一棟マンション/アパート';
     const salePrice = p.snapshot?.gaiyouOverride?.salePrice;
@@ -5153,14 +5179,56 @@ setTimeout(()=>{
   });
   $('#btnCloudSync')?.addEventListener('click', async ()=>{
     showToast('☁ クラウドから最新を取得中…','info');
-    const remote = await loadPropertiesFromCloud();
-    if(remote){
-      localStorage.setItem(PROPLIST_KEY, JSON.stringify(remote));
+    try{
+      const url = _proxyUrl();
+      if(!url){ showToast('❌ プロキシURL未設定','error'); return; }
+      const sep = url.includes('?') ? '&' : '?';
+      const fullUrl = url + sep + 'action=list_properties';
+      console.log('[Sync] GET', fullUrl);
+      const res = await fetch(fullUrl, {redirect:'follow'});
+      console.log('[Sync] status:', res.status, 'type:', res.type);
+      if(!res.ok){
+        showToast(`❌ HTTP ${res.status}：GAS Webアプリのアクセス権を「全員」に設定してください`,'error');
+        return;
+      }
+      const text = await res.text();
+      console.log('[Sync] response (first 200):', text.slice(0,200));
+      let arr;
+      try{ arr = JSON.parse(text); }catch(e){
+        showToast(`❌ JSON解析失敗：${text.slice(0,80)}`,'error');
+        return;
+      }
+      if(arr.error){
+        showToast(`❌ GAS エラー：${JSON.stringify(arr.error).slice(0,150)}`,'error');
+        return;
+      }
+      if(!Array.isArray(arr)){
+        showToast(`❌ 配列形式でない応答：${JSON.stringify(arr).slice(0,100)}`,'error');
+        return;
+      }
+      localStorage.setItem(PROPLIST_KEY, JSON.stringify(arr));
       if(typeof renderPropertyList === 'function') renderPropertyList();
-      showToast(`✅ ${remote.length}件 取得完了`,'success');
-    } else {
-      showToast('❌ 取得失敗（プロキシURL未設定または通信エラー）','error');
+      _updateSyncIndicator('synced', new Date());
+      showToast(`✅ ${arr.length}件 取得完了`,'success');
+    }catch(e){
+      console.error('[Sync] error:', e);
+      showToast(`❌ 通信エラー：${e.message.slice(0,150)}`,'error');
     }
+  });
+  // フリーワード検索：入力毎に再描画（debounce）
+  let _searchTimer = null;
+  $('#propSearchInput')?.addEventListener('input', ()=>{
+    const clearBtn = $('#propSearchClear');
+    if(clearBtn) clearBtn.style.display = $('#propSearchInput').value ? '' : 'none';
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(()=>renderPropertyList(), 150);
+  });
+  $('#propSearchClear')?.addEventListener('click', ()=>{
+    const inp = $('#propSearchInput'); if(!inp) return;
+    inp.value = '';
+    $('#propSearchClear').style.display = 'none';
+    renderPropertyList();
+    inp.focus();
   });
   $('#btnNewProperty')?.addEventListener('click', ()=>{
     STATE.currentPropertyId = '';
