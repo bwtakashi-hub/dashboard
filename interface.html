@@ -25,6 +25,9 @@
       --color-purple:        #7c3aed;
       --color-purple-hover:  #6d28d9;
 
+      --color-red:           #dc2626;
+      --color-red-hover:     #b91c1c;
+
       --color-disabled-bg:   #e2e8f0;
       --color-disabled-text: #94a3b8;
 
@@ -172,6 +175,12 @@
       color: var(--color-text-white);
     }
     a.box-purple:hover { background: var(--color-purple-hover); }
+
+    .box-red {
+      background: var(--color-red);
+      color: var(--color-text-white);
+    }
+    a.box-red:hover { background: var(--color-red-hover); }
 
     .box-disabled {
       background: var(--color-disabled-bg);
@@ -490,10 +499,11 @@
           <span class="box-label">GETE</span>
           <span class="box-arrow">&#x2197;</span>
         </a>
-        <div class="box box-disabled" aria-disabled="true">
-          <span class="box-icon">&#128337;</span>
-          <span class="box-label">予備</span>
-        </div>
+        <a class="box box-red" href="https://docs.google.com/spreadsheets/d/1mTl3fvF59gKHd0xgZ5Z1hyWHCQSSwcm6qI8viSg-ocw/edit?gid=423970402#gid=423970402" target="_blank" rel="noopener noreferrer">
+          <span class="box-icon">&#127968;</span>
+          <span class="box-label">住まっぷ専用</span>
+          <span class="box-arrow">&#x2197;</span>
+        </a>
         <div class="box box-disabled" aria-disabled="true">
           <span class="box-icon">&#128337;</span>
           <span class="box-label">予備</span>
