@@ -1006,9 +1006,9 @@
       <button class="btn btn-ghost" data-view="home">← トップに戻る</button>
     </div>
 
-    <!-- ステップ1：所在地のみ -->
+    <!-- ステップ1：物件種別のみ（所在地・物件名は謄本から自動抽出） -->
     <div class="card">
-      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ1 — 所在地を入力</h3>
+      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ1 — 物件種別を選択</h3>
       <div class="grid grid-2" style="gap:14px">
         <div>
           <label>物件種別</label>
@@ -1022,12 +1022,12 @@
           </select>
         </div>
         <div>
-          <label>所在地 <span style="color:#ef4444">*必須</span></label>
-          <input type="text" class="fld" id="qgAddr" placeholder="例：秋田県秋田市大町6丁目3-39" />
+          <label>所在地（任意・謄本から自動抽出）</label>
+          <input type="text" class="fld" id="qgAddr" placeholder="謄本に住所が含まれない場合のみ入力" />
         </div>
       </div>
       <div style="font-size:11px;color:var(--orange);margin-top:8px;line-height:1.6">
-        💡 <b>物件名は住所から自動特定</b>します（AIが推定）。間違っている場合は <b>概要書ビューで物件名セルをクリックして手入力修正</b>できます。
+        💡 <b>所在地・物件名は土地建物謄本から自動抽出</b>します。物件名はWeb検索でも補完。間違っている場合は <b>概要書ビューでセルをクリックして手入力修正</b>できます。
       </div>
     </div>
 
@@ -5025,10 +5025,7 @@ function bindQuickGaiyou(){
 
   document.getElementById('qgRun').onclick = async ()=>{
     const status = document.getElementById('qgStatus');
-    const addr = document.getElementById('qgAddr').value.trim();
-    if(!addr){
-      showToast('所在地を入力してください','error'); return;
-    }
+    const manualAddr = document.getElementById('qgAddr').value.trim();
     if(!deedFiles.length){
       showToast('土地建物謄本をアップロードしてください','error'); return;
     }
@@ -5036,34 +5033,46 @@ function bindQuickGaiyou(){
     status.innerHTML = '<div style="color:var(--blue)">🔄 STATE初期化中…</div>';
     resetSimulatorForm();
     if(document.getElementById('propType')) document.getElementById('propType').value = document.getElementById('qgPropType').value;
-    // 所在地を分割して入力
-    const m = addr.match(/^(.+?[都道府県])(.+?[市区町村])?(.*)$/);
-    if(m){
-      if(m[1]) document.getElementById('propPref').value = m[1];
-      if(m[2]) document.getElementById('propCity').value = m[2];
-      if(m[3]) document.getElementById('propAddr').value = m[3].trim();
-    } else {
-      document.getElementById('propAddr').value = addr;
+    // 手入力の住所がある場合は先にセット
+    if(manualAddr){
+      const m = manualAddr.match(/^(.+?[都道府県])(.+?[市区町村])?(.*)$/);
+      if(m){
+        if(m[1]) document.getElementById('propPref').value = m[1];
+        if(m[2]) document.getElementById('propCity').value = m[2];
+        if(m[3]) document.getElementById('propAddr').value = m[3].trim();
+      } else {
+        document.getElementById('propAddr').value = manualAddr;
+      }
     }
 
     // ファイルをSTATEへ
     STATE.files.deed = deedFiles.slice();
-    STATE.files.rr = []; // レントロール処理スキップ
+    STATE.files.rr = [];
 
-    // 謄本OCR
-    status.innerHTML = '<div style="color:var(--blue)">🤖 土地建物謄本をAI解析中…（30秒〜2分）</div>';
+    // 謄本OCR（住所も自動抽出される）
+    status.innerHTML = '<div style="color:var(--blue)">🤖 土地建物謄本をAI解析中…（住所・物件名・面積・地番・構造を抽出 / 30秒〜2分）</div>';
     try{ await document.getElementById('btnOcrBasic').onclick(); }catch(e){ console.warn('deed OCR fail', e); }
+
+    // 抽出後の住所を構築
+    const pref = document.getElementById('propPref').value.trim();
+    const city = document.getElementById('propCity').value.trim();
+    const addr1 = document.getElementById('propAddr').value.trim();
+    const fullAddr = `${pref}${city}${addr1}`;
+    if(!fullAddr){
+      status.innerHTML = '<div style="color:#ef4444">❌ 謄本から所在地を抽出できませんでした。ステップ1の所在地欄に手入力してから再実行してください。</div>';
+      return;
+    }
 
     // 物件名をAIで住所から推定（謄本に物件名がなかった場合）
     const currentName = document.getElementById('propName').value.trim();
     if(!currentName){
-      status.innerHTML = '<div style="color:var(--blue)">🔍 住所から物件名をAI推定中…</div>';
+      status.innerHTML = '<div style="color:var(--blue)">🔍 住所から物件名をAI推定中…（Web検索でSUUMO/HOMES等を調査）</div>';
       try {
         const result = await callClaudeWithSearch(
           [{role:'user', content:
             `次の住所にある収益不動産（賃貸マンション・アパート・テナントビル）の正式名称をWeb検索で特定してください。
 
-住所: ${addr}
+住所: ${fullAddr}
 
 【手順】
 1. SUUMO、HOMES、athome、楽待、健美家、不動産流通機構等を検索
@@ -5084,11 +5093,11 @@ function bindQuickGaiyou(){
 
     // 不動産情報ライブラリ（法令制限・インフラ・接道・駅・学校など22API）
     collectAll();
-    const fullAddr = `${STATE.basic.pref||''}${STATE.basic.city||''}${STATE.basic.addr||''}`;
-    if(fullAddr && STATE.reinfoKey){
+    const reinfoAddr = `${STATE.basic.pref||''}${STATE.basic.city||''}${STATE.basic.addr||''}`;
+    if(reinfoAddr && STATE.reinfoKey){
       status.innerHTML = '<div style="color:var(--blue)">🗺 不動産情報ライブラリから法令制限・インフラ・接道情報を取得中…（22API並列・30秒〜1分）</div>';
       try {
-        const geo = await geocodeAddress(fullAddr);
+        const geo = await geocodeAddress(reinfoAddr);
         if(geo && geo.lat && geo.lon){
           const results = await fetchAllOfficial(geo.lat, geo.lon, (done, all, name)=>{
             status.innerHTML = `<div style="color:var(--blue)">🗺 不動産Lib取得中… ${done}/${all} (${name})</div>`;
