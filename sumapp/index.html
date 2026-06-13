@@ -351,11 +351,11 @@
     </nav>
     <div class="api-panel">
       <span class="pill" id="apiStatus">Claude: 未設定</span>
-      <input type="password" id="apiKey" placeholder="Claude API Key または GASプロキシURL" autocomplete="off" style="width:200px;font-family:monospace;font-size:11px" title="sk-ant-... 形式の個人キー、または GASプロキシのWebアプリURL（共通利用推奨）" />
-      <span class="pill" id="driveStatus">Drive: 未設定</span>
-      <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px" />
+      <input type="password" id="apiKey" placeholder="Claude（既定値設定済）" autocomplete="off" style="width:160px;font-family:monospace;font-size:10px;opacity:0.5" title="既定値（GASプロキシURL）が設定済。個人キー使う場合のみ上書き入力" />
+      <span class="pill" id="driveStatus" style="display:none">Drive: 未設定</span>
+      <input type="password" id="driveKey" placeholder="Drive API Key" autocomplete="off" style="width:140px;font-family:monospace;font-size:11px;display:none" />
       <span class="pill" id="reinfoStatus">不動産Lib: 未設定</span>
-      <input type="password" id="reinfoKey" placeholder="GASプロキシURL or 不動産Lib APIキー" autocomplete="off" style="width:240px;font-family:monospace;font-size:11px" title="GASプロキシのWebアプリURL（推奨）または不動産情報ライブラリのAPIキー（CORS未対応）" />
+      <input type="password" id="reinfoKey" placeholder="不動産Lib（既定値設定済）" autocomplete="off" style="width:160px;font-family:monospace;font-size:10px;opacity:0.5" title="GASプロキシURL（共通利用）の既定値設定済。個人URL使う場合のみ上書き入力" />
       <span class="pill" id="oauthStatus">Drive OAuth: 未ログイン</span>
       <input type="text" id="oauthClientId" placeholder="OAuth Client ID（既定値設定済 / 変更時のみ入力）" autocomplete="off" style="width:200px;font-family:monospace;font-size:10px;opacity:0.5" title="Google Cloud Console で作成した Web OAuth クライアントID（既定値設定済）" />
       <button class="btn btn-ghost" id="googleSignIn" style="padding:6px 10px;font-size:11px;background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border:none" title="Googleアカウントでログイン → Driveの組織共有ファイルも取得可能に">🔐 Googleログイン</button>
@@ -365,6 +365,7 @@
       <button class="btn btn-ghost" id="toggleKey" style="padding:6px 8px;font-size:11px" title="表示/非表示">👁</button>
       <button class="btn btn-ghost" id="exportKeys" style="padding:6px 8px;font-size:11px" title="3つのAPIキーをクリップボードへエクスポート（別PC移行用）">📤</button>
       <button class="btn btn-ghost" id="importKeys" style="padding:6px 8px;font-size:11px" title="エクスポートしたJSONをインポート（別PCから移行）">📥</button>
+      <button class="btn btn-ghost" id="resetKeys" style="padding:6px 8px;font-size:11px" title="保存したAPIキーをクリアして既定値に戻す（全PCで共通の挙動になる）">🔄</button>
       <button class="btn btn-ghost" id="openGlossary" style="padding:6px 8px;font-size:11px" title="不動産投資 用語集">📖</button>
       <button class="btn btn-red" id="clearData" style="padding:6px 8px;font-size:11px" title="現在の編集中データのみクリア（APIキー・登録物件は保持）">🗑</button>
     </div>
@@ -1156,13 +1157,15 @@ const safeStorage = (function(){
 const DEFAULT_OAUTH_CLIENT_ID = '1082070115100-kbl92vt9uhbn0vre4d5voebnubank8cr.apps.googleusercontent.com';
 
 /* Claude API デフォルトプロキシURL（GAS Webアプリ）
-   ※ GAS側でCLAUDE_API_KEY秘匿、アプリ全PCで共通利用するため埋め込み済み */
+   ※ GAS側でCLAUDE_API_KEY秘匿、アプリ全PCで共通利用するため埋め込み済み
+   ※ 同URLで Claude API中継 + 物件同期 + 不動産Lib中継 を全部カバー（GAS統合版）*/
 const DEFAULT_CLAUDE_PROXY_URL = 'https://script.google.com/macros/s/AKfycbw-XVYFUJtvOH1zFwrix1RemMO2LSCW-NeJzdvxnC5B-taDhV1FVuxFgmygJ2pSwSbZAw/exec';
+const DEFAULT_REINFO_PROXY_URL = DEFAULT_CLAUDE_PROXY_URL; // 同じGAS URLを使う
 
 const STATE = {
   apiKey: safeStorage.getSync('claude_api_key') || DEFAULT_CLAUDE_PROXY_URL,
   driveKey: safeStorage.getSync('drive_api_key'),
-  reinfoKey: safeStorage.getSync('reinfo_api_key'),
+  reinfoKey: safeStorage.getSync('reinfo_api_key') || DEFAULT_REINFO_PROXY_URL,
   oauthClientId: safeStorage.getSync('oauth_client_id') || DEFAULT_OAUTH_CLIENT_ID,
   oauthToken: '',           // in-memory only（セッション中のみ保持、永続化しない）
   oauthExpiresAt: 0,
@@ -1217,6 +1220,7 @@ function refreshApiStatus(){
   }
 }
 $('#apiKey').value = STATE.apiKey;
+if($('#reinfoKey')) $('#reinfoKey').value = STATE.reinfoKey;
 if($('#oauthClientId')) $('#oauthClientId').value = STATE.oauthClientId;
 $('#driveKey').value = STATE.driveKey;
 if($('#reinfoKey')) $('#reinfoKey').value = STATE.reinfoKey;
@@ -1438,6 +1442,23 @@ setTimeout(()=>{
   $('#importKeys')?.addEventListener('click', ()=>{
     const json = prompt('別PCの📤ボタンでコピーしたJSONを貼り付けてください：');
     if(json && json.trim()) window.importApiKeys(json.trim());
+  });
+  $('#resetKeys')?.addEventListener('click', async ()=>{
+    if(!confirm('保存済の個別APIキーをクリアして、既定値（GASプロキシURL）に戻します。\n\nClaude / 不動産Lib / OAuth Client ID が全PC共通の挙動になります。\n\n続行しますか？')) return;
+    await safeStorage.set('claude_api_key', '');
+    await safeStorage.set('drive_api_key', '');
+    await safeStorage.set('reinfo_api_key', '');
+    await safeStorage.set('oauth_client_id', '');
+    STATE.apiKey = DEFAULT_CLAUDE_PROXY_URL;
+    STATE.driveKey = '';
+    STATE.reinfoKey = DEFAULT_REINFO_PROXY_URL;
+    STATE.oauthClientId = DEFAULT_OAUTH_CLIENT_ID;
+    $('#apiKey').value = STATE.apiKey;
+    if($('#driveKey')) $('#driveKey').value = '';
+    if($('#reinfoKey')) $('#reinfoKey').value = STATE.reinfoKey;
+    if($('#oauthClientId')) $('#oauthClientId').value = STATE.oauthClientId;
+    refreshApiStatus();
+    showToast('✅ 既定値に戻しました（全PC共通設定）','success');
   });
 }, 100);
 
