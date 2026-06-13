@@ -1030,13 +1030,12 @@
           <input type="text" class="fld" id="qgAddr" placeholder="謄本に住所が含まれない場合のみ入力" />
         </div>
         <div>
-          <label>満室想定家賃（任意・後で概要書で編集可）</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" class="fld money" id="qgRentFull" placeholder="例：350,000" style="flex:1" />
-            <select class="fld" id="qgRentUnit" style="width:90px">
-              <option value="month">月額</option>
-              <option value="year">年額</option>
-            </select>
+          <label>満室想定家賃（月額・任意）</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input type="text" class="fld" id="qgRentFull" placeholder="例：350,000" style="flex:1" />
+            <div style="font-size:11px;color:var(--sub);white-space:nowrap;line-height:1.4">
+              年額（自動）<br><b id="qgRentYearAuto" style="font-size:13px;color:var(--green)">¥0</b>
+            </div>
           </div>
         </div>
       </div>
@@ -4988,6 +4987,18 @@ function bindQuickGaiyou(){
   setupZone('qgDeedZone','qgDeedFile', deedFiles, document.getElementById('qgDeedFiles'));
   setupZone('qgRrZone','qgRrFile', rrFiles, document.getElementById('qgRrFiles'));
 
+  // 満室想定家賃 月額入力 → 年額自動表示
+  const qgRentInput = document.getElementById('qgRentFull');
+  const qgRentYearAuto = document.getElementById('qgRentYearAuto');
+  if(qgRentInput){
+    qgRentInput.addEventListener('input', ()=>{
+      const raw = qgRentInput.value.replace(/[^\d]/g,'');
+      qgRentInput.value = raw ? Number(raw).toLocaleString('ja-JP') : '';
+      const year = (Number(raw)||0) * 12;
+      if(qgRentYearAuto) qgRentYearAuto.textContent = '¥' + year.toLocaleString('ja-JP');
+    });
+  }
+
   // Driveフォルダから自動取得
   document.getElementById('qgDriveFetch').onclick = async ()=>{
     const url = document.getElementById('qgDriveUrl').value.trim();
@@ -5041,10 +5052,8 @@ function bindQuickGaiyou(){
     const status = document.getElementById('qgStatus');
     const manualAddr = document.getElementById('qgAddr').value.trim();
     const manualName = document.getElementById('qgName').value.trim();
-    const manualRent = Number(String(document.getElementById('qgRentFull').value||'').replace(/[^\d]/g,''))||0;
-    const rentUnit = document.getElementById('qgRentUnit').value;
-    // 入力値を月額に正規化
-    const manualMonthly = rentUnit === 'year' ? Math.round(manualRent/12) : manualRent;
+    // 満室想定家賃（月額）
+    const manualMonthly = Number(String(document.getElementById('qgRentFull').value||'').replace(/[^\d]/g,''))||0;
     if(!deedFiles.length){
       showToast('土地建物謄本をアップロードしてください','error'); return;
     }
