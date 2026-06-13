@@ -1148,6 +1148,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" data-view="list">← 一覧に戻る</button>
         <button class="btn btn-ghost" id="btnGaiyouAIStation" title="AI推定で最寄駅・ライフライン・周辺環境を一括取得">🤖 概要書情報を一括更新</button>
+        <button class="btn btn-ghost" id="btnGaiyouSheet" title="同じフォーマットでスプレッドシートに転記（バックアップ）" style="background:linear-gradient(135deg,#10b981,#0ea5e9);color:#fff;border:none">📤 シートへ転記</button>
         <button class="btn btn-orange" id="btnGaiyouPhoto" title="2ページ目の写真を追加（複数選択可）" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none">📷 写真追加</button>
         <input type="file" id="gaiyouPhotoFile" accept="image/*" multiple class="hide" />
         <button class="btn btn-primary" id="btnGaiyouSave">💾 更新を保存</button>
@@ -6000,7 +6001,46 @@ setTimeout(()=>{
   $('#btnGaiyouAIStation')?.addEventListener('click', updateStationByAI);
   $('#btnGaiyouPhoto')?.addEventListener('click', ()=>$('#gaiyouPhotoFile')?.click());
   $('#gaiyouPhotoFile')?.addEventListener('change', handleGaiyouPhotoUpload);
+  $('#btnGaiyouSheet')?.addEventListener('click', exportGaiyouToSheet);
 }, 300);
+
+/* 物件概要書をスプレッドシートに「同フォーマット」で書き出し（バックアップ用） */
+async function exportGaiyouToSheet(){
+  const sheet = $('.gaiyou-sheet');
+  if(!sheet){ showToast('物件概要書が開かれていません','error'); return; }
+  const propId = sheet.dataset.propId;
+  const p = getPropertyList().find(x=>x.id===propId);
+  if(!p){ showToast('物件データが見つかりません','error'); return; }
+  const url = (typeof _proxyUrl === 'function') ? _proxyUrl() : (DEFAULT_CLAUDE_PROXY_URL || '');
+  if(!url){ showToast('GASプロキシURLが未設定','error'); return; }
+  showToast('📤 スプレッドシートに転記中…','info');
+  try{
+    const payload = {
+      id: p.id,
+      name: p.name,
+      basic: p.snapshot?.basic || {},
+      rentRoll: p.snapshot?.rentRoll || [],
+      gaiyouOverride: p.snapshot?.gaiyouOverride || {},
+      areaInfo: p.snapshot?.areaInfo || {}
+    };
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(url + sep + 'action=write_gaiyou', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify(payload),
+      redirect:'follow'
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const r = await res.json();
+    if(r.error) throw new Error(r.error);
+    showToast(`✅ シート「${r.sheetName}」に転記完了`,'success');
+    if(r.url && confirm('スプレッドシートを新しいタブで開きますか？')){
+      window.open(r.url, '_blank');
+    }
+  }catch(e){
+    showToast('❌ 転記失敗: ' + e.message, 'error');
+  }
+}
 
 /* 概要書 写真アップロード（複数選択、1200px幅にリサイズ＋JPEG圧縮） */
 async function handleGaiyouPhotoUpload(e){
