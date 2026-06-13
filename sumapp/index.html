@@ -5298,10 +5298,21 @@ function _proxyUrl(){
 async function syncPropertiesToCloud(list, opts={}){
   const url = _proxyUrl();
   if(!url) return;
-  // 直近の同期内容と同じならスキップ
   const json = JSON.stringify(list);
   if(json === _lastSyncedHash && !opts.force) return;
-  // デバウンス：連続編集時は最後の1回だけ送信
+  // GAS送信制限：50MB超なら写真除外版で送信
+  let body = json;
+  const sizeMB = body.length / 1024 / 1024;
+  if(sizeMB > 25){
+    const slim = list.map(p=>{
+      if(p.snapshot && p.snapshot.gaiyouPhotos){
+        return { ...p, snapshot: { ...p.snapshot, gaiyouPhotos: [] } };
+      }
+      return p;
+    });
+    body = JSON.stringify(slim);
+    console.warn(`Sync payload ${sizeMB.toFixed(1)}MB > 25MB. Photos excluded from sync. Slim=${(body.length/1024/1024).toFixed(1)}MB`);
+  }
   if(_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
   _syncDebounceTimer = setTimeout(async ()=>{
     try{
@@ -5309,7 +5320,7 @@ async function syncPropertiesToCloud(list, opts={}){
       const res = await fetch(url + sep + 'action=save_properties', {
         method:'POST',
         headers:{'content-type':'application/json'},
-        body: json,
+        body: body,
         redirect:'follow'
       });
       if(res.ok){
@@ -5317,6 +5328,7 @@ async function syncPropertiesToCloud(list, opts={}){
         _updateSyncIndicator('synced', new Date());
       } else {
         _updateSyncIndicator('error');
+        console.warn('GAS sync HTTP', res.status, await res.text().catch(()=>''));
       }
     }catch(e){
       _updateSyncIndicator('error');
@@ -5373,18 +5385,36 @@ function _updateSyncIndicator(state, time){
     showToast(`☁ クラウドから ${remoteList.length}件 の物件を読込`, 'success');
     if(typeof renderPropertyList === 'function') renderPropertyList();
   } else if(localList.length > 0 && remoteList.length > 0){
-    // 両方データあり → IDベースでマージ（最新updated優先）
-    const map = new Map();
-    [...remoteList, ...localList].forEach(p=>{
-      const existing = map.get(p.id);
-      if(!existing || (p.updatedAt && (!existing.updatedAt || p.updatedAt > existing.updatedAt))){
-        map.set(p.id, p);
+    // 両方データあり → IDベースで「新しいupdatedAt」を採用、写真はローカル優先で保護
+    const localMap = new Map(localList.map(p=>[p.id, p]));
+    const merged = [];
+    const seenIds = new Set();
+    let changedCount = 0;
+    for(const r of remoteList){
+      seenIds.add(r.id);
+      const l = localMap.get(r.id);
+      if(!l){ merged.push(r); changedCount++; continue; }
+      // updatedAt比較（文字列または数値、両対応）
+      const ru = new Date(r.updatedAt || 0).getTime();
+      const lu = new Date(l.updatedAt || 0).getTime();
+      if(ru > lu){
+        // リモートが新しい → リモート採用。ただし写真はローカルに保持されていれば残す
+        if(l.snapshot?.gaiyouPhotos?.length && !r.snapshot?.gaiyouPhotos?.length){
+          r.snapshot = { ...(r.snapshot||{}), gaiyouPhotos: l.snapshot.gaiyouPhotos };
+        }
+        merged.push(r);
+        changedCount++;
+      } else {
+        merged.push(l);
       }
-    });
-    const merged = Array.from(map.values());
-    if(merged.length !== localList.length){
+    }
+    // リモートに無いローカル物件も保持
+    for(const l of localList){
+      if(!seenIds.has(l.id)) merged.push(l);
+    }
+    if(changedCount > 0){
       localStorage.setItem(PROPLIST_KEY, JSON.stringify(merged));
-      showToast(`☁ クラウドと同期：${merged.length}件 (前${localList.length}件)`, 'info');
+      showToast(`☁ クラウドから ${changedCount}件 更新を反映`, 'success');
       if(typeof renderPropertyList === 'function') renderPropertyList();
     }
   } else if(localList.length > 0 && remoteList.length === 0){
@@ -5953,6 +5983,7 @@ async function updateStationByAI(){
     if(Array.isArray(data.kisei) && data.kisei.length){
       ov.kisei = data.kisei.join(' / ');
     }
+    p.updatedAt = new Date().toISOString();
     savePropertyList(list);
     showToast('✅ 概要書情報を一括更新しました','success');
     // 再描画
@@ -5992,6 +6023,7 @@ async function handleGaiyouPhotoUpload(e){
       console.warn('写真処理失敗:', f.name, err.message);
     }
   }
+  p.updatedAt = new Date().toISOString();
   try{
     savePropertyList(list);
   }catch(err){
@@ -6052,6 +6084,7 @@ function bindGaiyouPhotoEvents(){
       if(!p || !p.snapshot.gaiyouPhotos) return;
       if(!confirm(`写真${idx+1}を削除しますか？`)) return;
       p.snapshot.gaiyouPhotos.splice(idx, 1);
+      p.updatedAt = new Date().toISOString();
       savePropertyList(list);
       $('#gaiyouContainer').innerHTML = buildGaiyouHTML(p);
       bindGaiyouEvents();
@@ -6070,6 +6103,7 @@ function bindGaiyouPhotoEvents(){
       const p = list.find(x=>x.id===propId);
       if(!p || !p.snapshot.gaiyouPhotos || !p.snapshot.gaiyouPhotos[idx]) return;
       p.snapshot.gaiyouPhotos[idx].caption = el.textContent.trim().slice(0,40);
+      p.updatedAt = new Date().toISOString();
       savePropertyList(list);
     };
   });
@@ -6385,6 +6419,7 @@ function saveGaiyouOverrides(){
     }
     p.snapshot.gaiyouOverride[key] = val;
   });
+  p.updatedAt = new Date().toISOString(); // ← 重要：マージ時の優先判定に使う
   savePropertyList(list);
   showToast('💾 物件概要書を更新しました','success');
   // 再描画
