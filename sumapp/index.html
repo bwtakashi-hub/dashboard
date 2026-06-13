@@ -5118,6 +5118,9 @@ function bindQuickGaiyou(){
         $('#gaiyouContainer').innerHTML = buildGaiyouHTML(entry);
         bindGaiyouEvents();
         showView('gaiyou');
+        // 周辺環境・地域条例・道路情報をAIで補完
+        status.innerHTML = '<div style="color:var(--blue)">🤖 周辺環境・地域条例・道路情報をAI補完中…（30秒〜1分）</div>';
+        try { await updateStationByAI(); } catch(e){ console.warn('updateStationByAI fail', e); }
         showToast('✅ 物件概要書を作成しました。金額は各セルをクリックして編集可能です','success');
         status.innerHTML = '<div style="color:var(--green)">✅ 完了</div>';
       } else {
@@ -5869,7 +5872,9 @@ async function updateStationByAI(){
   "gas": "ガス種別と事業者（例: 都市ガス 東京ガス、プロパンガス）",
   "suidou": "上水道（例: 公営水道、簡易水道）",
   "gesui": "下水道（例: 公共下水道、合併浄化槽、単独浄化槽、汲み取り）",
-  "shisetsu": "周辺施設・住環境を150字以内で具体的に。スーパー名（成城石井/東急ストア等）・コンビニ・商業施設・駅前環境・住宅街の特徴等を含める"
+  "shisetsu": "周辺施設・住環境を150字以内で具体的に。スーパー名（成城石井/東急ストア等）・コンビニ・商業施設・駅前環境・住宅街の特徴等を含める",
+  "kisei": ["該当市区町村の地域条例・指導要綱を3-6個。例: 景観条例 / 駐車場附置義務 / 緑化条例 / 中高層建築物指導要綱 / 福祉のまちづくり条例 / 駐輪場設置義務 / 環境影響評価条例 / 文化財保護条例 / 高度地区規制 / 風致地区条例 等から該当するものをリスト形式で"],
+  "douro": "前面道路の状況。幅員（例:4m）・公道/私道・接道方位（南側等）・建築基準法42条1項or2項の区分があれば記載。不明なら'未確認'"
 }
 
 【徒歩分の計算根拠】
@@ -5904,6 +5909,10 @@ async function updateStationByAI(){
     if(data.suidou) ov.suidou = data.suidou;
     if(data.gesui) ov.gesui = data.gesui;
     if(data.shisetsu) ov.shisetsu = data.shisetsu;
+    if(data.douro) ov.douro = data.douro;
+    if(Array.isArray(data.kisei) && data.kisei.length){
+      ov.kisei = data.kisei.join(' / ');
+    }
     savePropertyList(list);
     showToast('✅ 概要書情報を一括更新しました','success');
     // 再描画
