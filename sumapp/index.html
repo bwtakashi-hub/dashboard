@@ -1006,9 +1006,9 @@
       <button class="btn btn-ghost" data-view="home">← トップに戻る</button>
     </div>
 
-    <!-- ステップ1：物件種別のみ（所在地・物件名は謄本から自動抽出） -->
+    <!-- ステップ1：物件種別・物件名・所在地・満室想定家賃 -->
     <div class="card">
-      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ1 — 物件種別を選択</h3>
+      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ1 — 基本情報（すべて任意・空欄は自動補完）</h3>
       <div class="grid grid-2" style="gap:14px">
         <div>
           <label>物件種別</label>
@@ -1022,8 +1022,22 @@
           </select>
         </div>
         <div>
+          <label>物件名（任意・謄本/Web検索で自動推定）</label>
+          <input type="text" class="fld" id="qgName" placeholder="例：マンション大町台（空欄でOK）" />
+        </div>
+        <div>
           <label>所在地（任意・謄本から自動抽出）</label>
           <input type="text" class="fld" id="qgAddr" placeholder="謄本に住所が含まれない場合のみ入力" />
+        </div>
+        <div>
+          <label>満室想定家賃（任意・後で概要書で編集可）</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" class="fld money" id="qgRentFull" placeholder="例：350,000" style="flex:1" />
+            <select class="fld" id="qgRentUnit" style="width:90px">
+              <option value="month">月額</option>
+              <option value="year">年額</option>
+            </select>
+          </div>
         </div>
       </div>
       <div style="font-size:11px;color:var(--orange);margin-top:8px;line-height:1.6">
@@ -5026,6 +5040,11 @@ function bindQuickGaiyou(){
   document.getElementById('qgRun').onclick = async ()=>{
     const status = document.getElementById('qgStatus');
     const manualAddr = document.getElementById('qgAddr').value.trim();
+    const manualName = document.getElementById('qgName').value.trim();
+    const manualRent = Number(String(document.getElementById('qgRentFull').value||'').replace(/[^\d]/g,''))||0;
+    const rentUnit = document.getElementById('qgRentUnit').value;
+    // 入力値を月額に正規化
+    const manualMonthly = rentUnit === 'year' ? Math.round(manualRent/12) : manualRent;
     if(!deedFiles.length){
       showToast('土地建物謄本をアップロードしてください','error'); return;
     }
@@ -5033,7 +5052,8 @@ function bindQuickGaiyou(){
     status.innerHTML = '<div style="color:var(--blue)">🔄 STATE初期化中…</div>';
     resetSimulatorForm();
     if(document.getElementById('propType')) document.getElementById('propType').value = document.getElementById('qgPropType').value;
-    // 手入力の住所がある場合は先にセット
+    // 手入力の物件名・住所は先にセット
+    if(manualName) document.getElementById('propName').value = manualName;
     if(manualAddr){
       const m = manualAddr.match(/^(.+?[都道府県])(.+?[市区町村])?(.*)$/);
       if(m){
@@ -5114,6 +5134,17 @@ function bindQuickGaiyou(){
     try {
       const entry = saveCurrentProperty();
       if(entry && entry.id){
+        // 満室想定家賃の手入力値を gaiyouOverride に反映
+        if(manualMonthly > 0){
+          const listRef = getPropertyList();
+          const propRef = listRef.find(x=>x.id===entry.id);
+          if(propRef){
+            if(!propRef.snapshot.gaiyouOverride) propRef.snapshot.gaiyouOverride = {};
+            propRef.snapshot.gaiyouOverride.rentFullMonthly = manualMonthly;
+            savePropertyList(listRef);
+            entry.snapshot = propRef.snapshot;
+          }
+        }
         // 概要書ビューへ遷移＋描画
         $('#gaiyouContainer').innerHTML = buildGaiyouHTML(entry);
         bindGaiyouEvents();
