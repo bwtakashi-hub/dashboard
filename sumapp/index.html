@@ -4884,6 +4884,76 @@ function showView(v){
   document.body.classList.toggle('print-gaiyou', v==='gaiyou');
 }
 
+/* 不動産情報ライブラリ22API結果から STATE.areaInfo に整形抽出 */
+function _extractAreaInfoFromReinfo(results){
+  if(!results) return;
+  if(!STATE.areaInfo) STATE.areaInfo = {};
+  const pick = (arr, keys) => {
+    if(!arr || !arr.length) return null;
+    const o = arr[0];
+    for(const k of keys){ if(o[k] != null && o[k] !== '') return o[k]; }
+    return null;
+  };
+  // 用途地域・建蔽率・容積率（XKT002）
+  if(results.XKT002 && results.XKT002.hits?.length){
+    STATE.areaInfo.youto_chiiki = pick(results.XKT002.hits, ['use_area_ja','use_area']);
+    STATE.areaInfo.kenpei = pick(results.XKT002.hits, ['u_building_coverage_ratio_ja','building_coverage_ratio_ja']);
+    STATE.areaInfo.yoseki = pick(results.XKT002.hits, ['u_floor_area_ratio_ja','floor_area_ratio_ja']);
+  }
+  // 都市計画区分（XKT001）
+  if(results.XKT001 && results.XKT001.hits?.length){
+    STATE.areaInfo.toshi_keikaku = pick(results.XKT001.hits, ['urban_area_ja','kuiki_kubun_ja','area_type_ja']);
+  }
+  // 防火地域（XKT014）
+  if(results.XKT014 && results.XKT014.hits?.length){
+    STATE.areaInfo.boukaku = pick(results.XKT014.hits, ['fire_prevention_district_ja','fire_district_ja']);
+  }
+  // 高度地区（XKT024）
+  if(results.XKT024 && results.XKT024.hits?.length){
+    STATE.areaInfo.koudo = pick(results.XKT024.hits, ['height_district_ja','koudo_chiku_ja']);
+  }
+  // 災害リスク（複数集約）
+  const saigai = [];
+  ['XKT016','XKT025','XKT026','XKT027','XKT028','XKT029'].forEach(id=>{
+    if(results[id] && results[id].hits?.length){
+      const nm = results[id].name || id;
+      saigai.push(nm);
+    }
+  });
+  if(saigai.length) STATE.areaInfo.saigai_risk = saigai;
+  // 地区計画・規制（XKT023, XKT030等）
+  const kisei = [];
+  if(results.XKT023 && results.XKT023.hits?.length) kisei.push('地区計画区域内');
+  if(results.XKT030 && results.XKT030.hits?.length) kisei.push('都市計画道路区域');
+  if(kisei.length) STATE.areaInfo.kisei = kisei;
+  // 最寄駅（XKT015）— 駅情報を transit にまとめる
+  if(results.XKT015 && results.XKT015.nearest?.length){
+    const n0 = results.XKT015.nearest[0];
+    if(n0 && n0.props){
+      const name = n0.props.station_g_name_ja || n0.props.station_name_ja || n0.props.station_name || '—';
+      const line = n0.props.line_name_ja || n0.props.operation_company_ja || '';
+      const dist = typeof n0.distance === 'number' ? n0.distance.toFixed(2) : '—';
+      const walkMin = typeof n0.distance === 'number' ? Math.ceil(n0.distance * 1000 / 80) : '—';
+      STATE.areaInfo.transit = `${line ? line + ' ' : ''}${name}駅 徒歩約${walkMin}分（直線${dist}km）`;
+    }
+  }
+  // 周辺施設の集約
+  const shisetsuList = [];
+  if(results.XKT004 && results.XKT004.hits?.length){
+    const v = pick(results.XKT004.hits, ['school_name_ja','school_name','name']);
+    if(v) shisetsuList.push('小学校区: ' + v);
+  }
+  if(results.XKT005 && results.XKT005.hits?.length){
+    const v = pick(results.XKT005.hits, ['school_name_ja','school_name','name']);
+    if(v) shisetsuList.push('中学校区: ' + v);
+  }
+  if(results.XKT010 && results.XKT010.nearest?.length){
+    const v = results.XKT010.nearest[0].props?.facility_name_ja || results.XKT010.nearest[0].props?.name;
+    if(v) shisetsuList.push('医療: ' + v);
+  }
+  if(shisetsuList.length) STATE.areaInfo.shisetsu = shisetsuList.join(' / ');
+}
+
 /* ===== クイック概要書作成：謄本+レントロール→AI解析→物件登録→概要書 ===== */
 let _qgBound = false;
 function bindQuickGaiyou(){
@@ -5023,6 +5093,25 @@ function bindQuickGaiyou(){
     if(rrFiles.length){
       status.innerHTML = '<div style="color:var(--blue)">🤖 レントロールをAI解析中…（30秒〜2分）</div>';
       try{ await document.getElementById('btnOcrRR').onclick(); }catch(e){ console.warn(e); }
+    }
+
+    // 不動産情報ライブラリ（法令制限・インフラ・接道・駅・学校など22API）
+    collectAll();
+    const fullAddr = `${STATE.basic.pref||''}${STATE.basic.city||''}${STATE.basic.addr||''}`;
+    if(fullAddr && STATE.reinfoKey){
+      status.innerHTML = '<div style="color:var(--blue)">🗺 不動産情報ライブラリから法令制限・インフラ・接道情報を取得中…（22API並列・30秒〜1分）</div>';
+      try {
+        const geo = await geocodeAddress(fullAddr);
+        if(geo && geo.lat && geo.lon){
+          const results = await fetchAllOfficial(geo.lat, geo.lon, (done, all, name)=>{
+            status.innerHTML = `<div style="color:var(--blue)">🗺 不動産Lib取得中… ${done}/${all} (${name})</div>`;
+          });
+          if(!STATE.areaInfo) STATE.areaInfo = {};
+          STATE.areaInfo._reinfo_full = results;
+          // 用途地域・建蔽率・容積率・防火地域・接道などを抽出して STATE.areaInfo に
+          _extractAreaInfoFromReinfo(results);
+        }
+      } catch(e){ console.warn('reinfo fetch failed', e.message); }
     }
 
     status.innerHTML = '<div style="color:var(--blue)">💾 物件を登録中…</div>';
@@ -5961,11 +6050,15 @@ function buildGaiyouHTML(p){
   const isMulti    = ptype === '一棟マンション/アパート' || isTenant;
   const occupied = (s.rentRoll||[]).filter(x=>!x.vacancy).length;
   const total = (s.rentRoll||[]).length;
-  const monthly = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
+  const monthlyAuto = (s.rentRoll||[]).reduce((sum,x)=>sum + (x.rent||0) + (x.mgmt||0), 0);
+  const curRentMonthlyAuto = (s.rentRoll||[]).filter(x=>!x.vacancy).reduce((sm,x)=>sm+(x.rent||0)+(x.mgmt||0),0);
+  // override（手入力）優先、なければレントロール自動集計値
+  const monthly = (ov.rentFullMonthly !== undefined && ov.rentFullMonthly !== '') ? Number(ov.rentFullMonthly)||0 : monthlyAuto;
+  const curRentMonthly = (ov.rentCurMonthly !== undefined && ov.rentCurMonthly !== '') ? Number(ov.rentCurMonthly)||0 : curRentMonthlyAuto;
   const annualRent = monthly * 12;
+  const curRent = curRentMonthly * 12;
   const salePrice = ov.salePrice !== undefined ? Number(ov.salePrice)||0 : 0;
   const saleYield = salePrice > 0 ? (annualRent / salePrice * 100) : 0;
-  const curRent = (s.rentRoll||[]).filter(x=>!x.vacancy).reduce((sm,x)=>sm+(x.rent||0)+(x.mgmt||0),0)*12;
   const curYield = salePrice > 0 ? (curRent / salePrice * 100) : 0;
   const ed = (key, val, type='text') => `<span class="g-edit" data-key="${key}" data-type="${type}" contenteditable="true" spellcheck="false">${val==null||val===''?'—':val}</span>`;
 
@@ -6150,10 +6243,16 @@ function buildGaiyouHTML(p){
         <td class="g-price-mini" id="gaiyouYieldCell" style="text-align:center;width:32%;font-size:11pt">${saleYield>0?saleYield.toFixed(2)+'%':'—'}</td>
       </tr>
       <tr>
-        <th>満室想定 月額/年額</th>
-        <td class="r">${fy(monthly)} / <b>${fy(annualRent)}</b></td>
+        <th>満室想定 月額（手入力）</th>
+        <td style="text-align:center"><span class="g-edit g-edit-monthly-full" data-key="rentFullMonthly" data-type="money" contenteditable="true" spellcheck="false">${monthly>0?fy(monthly):'—'}</span><span style="font-size:7pt;color:#94a3b8;margin-left:6px">年 <b id="gaiyouAnnualFullCell">${fy(annualRent)}</b></span></td>
+        <th>表面利回り（自動）</th>
+        <td class="g-price-mini" id="gaiyouYieldCell" style="text-align:center;font-size:11pt">${saleYield>0?saleYield.toFixed(2)+'%':'—'}</td>
+      </tr>
+      <tr>
+        <th>現況 月額（手入力）</th>
+        <td style="text-align:center"><span class="g-edit g-edit-monthly-cur" data-key="rentCurMonthly" data-type="money" contenteditable="true" spellcheck="false">${curRentMonthly>0?fy(curRentMonthly):'—'}</span><span style="font-size:7pt;color:#94a3b8;margin-left:6px">年 <b id="gaiyouAnnualCurCell">${fy(curRent)}</b></span></td>
         <th>現況利回り（自動）</th>
-        <td id="gaiyouCurYieldCell" style="text-align:right;font-weight:700;color:#10b981">${curYield>0?curYield.toFixed(2)+'%':'—'}　<span style="font-size:7pt;color:#94a3b8">(月額 ${fy(curRent/12)})</span></td>
+        <td id="gaiyouCurYieldCell" style="text-align:center;font-weight:700;color:#10b981">${curYield>0?curYield.toFixed(2)+'%':'—'}</td>
       </tr>
       ${(r.loanPaymentY>0 || r.leaseRentY>0) ? `
       <tr>
@@ -6262,6 +6361,11 @@ function bindGaiyouEvents(){
   if(!priceEl) return;
   const fy = n => '¥' + Math.round(Number(n)||0).toLocaleString('ja-JP');
 
+  // 月額手入力欄
+  const monthlyFullEl = document.querySelector('.g-edit-monthly-full');
+  const monthlyCurEl  = document.querySelector('.g-edit-monthly-cur');
+  const parseMoney_ = s => Number(String(s||'').replace(/[^\d]/g,''))||0;
+
   // 利回り再計算
   const update = ()=>{
     const sheet = $('.gaiyou-sheet');
@@ -6269,17 +6373,50 @@ function bindGaiyouEvents(){
     const p = getPropertyList().find(x=>x.id===propId);
     if(!p) return;
     const rentRoll = p.snapshot.rentRoll||[];
-    const annualAll = rentRoll.reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
-    const annualCur = rentRoll.filter(x=>!x.vacancy).reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
-    const raw = priceEl.textContent.replace(/[^\d]/g,'');
-    const price = raw ? Number(raw) : 0;
+    const annualAllAuto = rentRoll.reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
+    const annualCurAuto = rentRoll.filter(x=>!x.vacancy).reduce((s,x)=>s+(x.rent||0)+(x.mgmt||0),0)*12;
+    // 手入力月額が優先（あれば）
+    const monthlyFull = monthlyFullEl ? parseMoney_(monthlyFullEl.textContent) : 0;
+    const monthlyCur  = monthlyCurEl  ? parseMoney_(monthlyCurEl.textContent)  : 0;
+    const annualAll = monthlyFull > 0 ? monthlyFull * 12 : annualAllAuto;
+    const annualCur = monthlyCur  > 0 ? monthlyCur  * 12 : annualCurAuto;
+    const price = parseMoney_(priceEl.textContent);
     const y1 = price>0 ? (annualAll/price*100).toFixed(2)+'%' : '—';
     const y2 = price>0 ? (annualCur/price*100).toFixed(2)+'%' : '—';
     const yc = $('#gaiyouYieldCell');
     const yc2 = $('#gaiyouCurYieldCell');
     if(yc) yc.textContent = y1;
     if(yc2) yc2.textContent = y2;
+    // 年額表示更新
+    const afc = $('#gaiyouAnnualFullCell');
+    const acc = $('#gaiyouAnnualCurCell');
+    if(afc) afc.textContent = '¥' + annualAll.toLocaleString('ja-JP');
+    if(acc) acc.textContent = '¥' + annualCur.toLocaleString('ja-JP');
   };
+
+  // 月額入力欄の編集ハンドラ
+  [monthlyFullEl, monthlyCurEl].forEach(el=>{
+    if(!el) return;
+    el.addEventListener('input', ()=>{
+      const raw = el.textContent.replace(/[^\d]/g,'');
+      const formatted = raw ? fy(Number(raw)) : '';
+      if(el.textContent !== formatted && raw){
+        el.textContent = formatted;
+        const range = document.createRange();
+        range.selectNodeContents(el); range.collapse(false);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      }
+      update();
+    });
+    el.addEventListener('blur', ()=>{
+      const raw = el.textContent.replace(/[^\d]/g,'');
+      el.textContent = raw ? fy(Number(raw)) : '—';
+      update();
+    });
+    el.addEventListener('focus', ()=>{
+      if(el.textContent === '—') el.textContent = '';
+    });
+  });
 
   // 入力中：数字だけ抜き出してカンマ整形（カーソル位置は末尾固定で簡略化）
   priceEl.addEventListener('input', ()=>{
