@@ -1040,6 +1040,21 @@
     <!-- ステップ2：書類アップロード -->
     <div class="card" style="margin-top:14px">
       <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ2 — 必要書類をアップロード</h3>
+
+      <!-- ステップ2A：Driveフォルダから自動取得 -->
+      <div style="margin-bottom:18px;padding:14px;border-radius:10px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(139,92,246,0.06));border:1px solid rgba(14,165,233,0.30)">
+        <div style="font-weight:700;font-size:13px;color:var(--blue);margin-bottom:8px">☁ Driveフォルダから自動取得（推奨）</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">フォルダ全体のファイルから「謄本」「レントロール」を自動振り分けして取得します。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="qgDriveUrl" class="fld" placeholder="https://drive.google.com/drive/folders/..." style="flex:1;min-width:280px" />
+          <button class="btn btn-primary" id="qgDriveFetch" style="white-space:nowrap;padding:10px 20px;font-weight:700">📡 Driveから抽出</button>
+        </div>
+        <div id="qgDriveStatus" style="margin-top:8px;font-size:12px"></div>
+        <div style="font-size:10px;color:var(--sub);margin-top:6px">💡 ファイル名で自動判定：謄本/登記/公図/全部事項 → 📄謄本／レントロール/賃料一覧/.xlsx → 📊レントロール</div>
+      </div>
+
+      <div style="text-align:center;font-size:11px;color:var(--sub);margin:4px 0 12px">— または個別アップロード —</div>
+
       <div class="grid grid-2" style="gap:14px">
         <div>
           <label style="display:block;margin-bottom:6px"><span style="color:var(--blue);font-weight:700">📄 土地建物謄本</span>（複数選択可）</label>
@@ -4904,6 +4919,69 @@ function bindQuickGaiyou(){
   }
   setupZone('qgDeedZone','qgDeedFile', deedFiles, document.getElementById('qgDeedFiles'));
   setupZone('qgRrZone','qgRrFile', rrFiles, document.getElementById('qgRrFiles'));
+
+  // Driveフォルダから自動取得
+  document.getElementById('qgDriveFetch').onclick = async ()=>{
+    const url = document.getElementById('qgDriveUrl').value.trim();
+    const status = document.getElementById('qgDriveStatus');
+    if(!url){ showToast('DriveフォルダURLを入力してください','error'); return; }
+    const folderId = (typeof parseDriveFolderId === 'function') ? parseDriveFolderId(url) : null;
+    if(!folderId){ showToast('正しいDriveフォルダURLを入力してください','error'); return; }
+    if(!isOauthValid() && !STATE.driveKey){
+      status.innerHTML = '<div style="color:#ef4444">❌ 「🔐 Googleログイン」してください（画面右上）</div>';
+      return;
+    }
+
+    status.innerHTML = '<div style="color:var(--blue)">📡 Driveからファイル一覧を取得中…</div>';
+    try {
+      const files = await driveListFolder(folderId);
+      if(!files.length){
+        status.innerHTML = '<div style="color:var(--orange)">⚠ フォルダにファイルがありません（共有設定確認）</div>';
+        return;
+      }
+      // 自動カテゴリ振り分け（謄本とレントロールのみ採用）
+      const deedDrive = files.filter(f => {
+        const c = categorizeDriveFile(f);
+        return c === 'deed';
+      });
+      const rrDrive = files.filter(f => {
+        const c = categorizeDriveFile(f);
+        return c === 'rr';
+      });
+      if(!deedDrive.length && !rrDrive.length){
+        status.innerHTML = `<div style="color:var(--orange)">⚠ フォルダ内${files.length}件から謄本・レントロールに該当するファイルが見つかりませんでした</div>`;
+        return;
+      }
+
+      status.innerHTML = `<div style="color:var(--blue)">📥 取得中… 謄本${deedDrive.length}件 / レントロール${rrDrive.length}件</div>`;
+      let okDeed = 0, okRR = 0;
+      const failed = [];
+      for(const f of deedDrive){
+        try {
+          const file = await driveDownloadFile(f);
+          if(file) { deedFiles.push(file); okDeed++; }
+        } catch(e){ failed.push(f.name); }
+      }
+      for(const f of rrDrive){
+        try {
+          const file = await driveDownloadFile(f);
+          if(file) { rrFiles.push(file); okRR++; }
+        } catch(e){ failed.push(f.name); }
+      }
+      renderChips(deedFiles, document.getElementById('qgDeedFiles'));
+      renderChips(rrFiles, document.getElementById('qgRrFiles'));
+
+      let html = `<div style="color:var(--green);font-weight:700">✅ 取得完了：📄謄本${okDeed}件 / 📊レントロール${okRR}件</div>`;
+      if(failed.length){
+        html += `<div style="color:var(--orange);font-size:11px;margin-top:4px">⚠ ${failed.length}件取得失敗: ${failed.slice(0,3).join(', ')}${failed.length>3?'...':''}</div>`;
+      }
+      status.innerHTML = html;
+      showToast(`✅ Drive取込完了（謄本${okDeed}+レントロール${okRR}）`,'success');
+    } catch(e){
+      status.innerHTML = `<div style="color:#ef4444">❌ ${e.message}</div>`;
+      showToast('Drive取込失敗: '+e.message,'error');
+    }
+  };
 
   document.getElementById('qgRun').onclick = async ()=>{
     const status = document.getElementById('qgStatus');
