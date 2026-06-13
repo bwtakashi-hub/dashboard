@@ -6034,8 +6034,18 @@ async function exportGaiyouToSheet(){
     const r = await res.json();
     if(r.error) throw new Error(r.error);
     showToast(`✅ シート「${r.sheetName}」に転記完了`,'success');
-    if(r.url && confirm('スプレッドシートを新しいタブで開きますか？')){
-      window.open(r.url, '_blank');
+    if(r.url){
+      const goOpen = confirm(
+        'スプレッドシートを新しいタブで開きますか？\n\n' +
+        'A4印刷の手順：\n' +
+        '① ファイル → 印刷\n' +
+        '② 用紙の向き: 横（ランドスケープ）\n' +
+        '③ 用紙サイズ: A4\n' +
+        '④ 余白: 狭い\n' +
+        '⑤ スケール: 「幅に合わせる」\n' +
+        '⑥ プレビュー → 印刷'
+      );
+      if(goOpen) window.open(r.url, '_blank');
     }
   }catch(e){
     showToast('❌ 転記失敗: ' + e.message, 'error');
