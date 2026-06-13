@@ -377,16 +377,21 @@
       <div style="font-size:96px;margin-bottom:16px;line-height:1">🏢</div>
       <h2 style="font-size:56px;margin-bottom:14px;letter-spacing:.06em;font-weight:900">株式会社 住まっぷ</h2>
       <div style="color:var(--sub);font-size:22px;margin-bottom:64px;letter-spacing:.1em">収益物件 AI 査定シミュレーター</div>
-      <div class="grid grid-2" style="max-width:1300px;margin:0 auto;gap:32px">
-        <a class="nav-card" data-view="simulator" style="text-decoration:none;padding:64px 36px">
-          <div style="font-size:72px;line-height:1;margin-bottom:14px">📊</div>
-          <div class="nav-card-title" style="font-size:28px;margin-bottom:12px">査定シミュレーター</div>
-          <div class="nav-card-desc" style="font-size:18px;line-height:1.8">物件情報・レントロール・経費を入力してAIで査定。<br>3パターン価格・将来予測・PDFレポート出力</div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);max-width:1500px;margin:0 auto;gap:28px">
+        <a class="nav-card" data-view="simulator" style="text-decoration:none;padding:56px 28px">
+          <div style="font-size:64px;line-height:1;margin-bottom:14px">📊</div>
+          <div class="nav-card-title" style="font-size:24px;margin-bottom:12px">査定シミュレーター</div>
+          <div class="nav-card-desc" style="font-size:15px;line-height:1.7">物件情報・レントロール・経費を入力してAIで査定。<br>3パターン価格・将来予測・PDFレポート出力</div>
         </a>
-        <a class="nav-card" data-view="list" style="text-decoration:none;padding:64px 36px">
-          <div style="font-size:72px;line-height:1;margin-bottom:14px">📋</div>
-          <div class="nav-card-title" style="font-size:28px;margin-bottom:12px">物件登録一覧</div>
-          <div class="nav-card-desc" style="font-size:18px;line-height:1.8">登録済みの物件を一覧表示。<br>編集・複製・物件概要書出力・削除</div>
+        <a class="nav-card" data-view="quickgaiyou" style="text-decoration:none;padding:56px 28px;background:linear-gradient(135deg,rgba(16,185,129,0.10),rgba(245,158,11,0.10));border:2px solid rgba(16,185,129,0.35)">
+          <div style="font-size:64px;line-height:1;margin-bottom:14px">📄</div>
+          <div class="nav-card-title" style="font-size:24px;margin-bottom:12px;color:#10b981">物件概要書のみ作成</div>
+          <div class="nav-card-desc" style="font-size:15px;line-height:1.7">土地建物謄本・レントロールから<br>AIが概要書を自動作成（金額は手入力）</div>
+        </a>
+        <a class="nav-card" data-view="list" style="text-decoration:none;padding:56px 28px">
+          <div style="font-size:64px;line-height:1;margin-bottom:14px">📋</div>
+          <div class="nav-card-title" style="font-size:24px;margin-bottom:12px">物件登録一覧</div>
+          <div class="nav-card-desc" style="font-size:15px;line-height:1.7">登録済みの物件を一覧表示。<br>編集・複製・物件概要書出力・削除</div>
         </a>
       </div>
       <div style="margin-top:56px;font-size:14px;color:var(--sub)">最終更新: <span id="homeStat">—</span></div>
@@ -991,6 +996,90 @@
   </section><!-- /view-simulator -->
 
   <!-- ===== LIST VIEW ===== -->
+  <!-- ===== QUICK GAIYOU VIEW（物件概要書のみ作成・簡易フロー） ===== -->
+  <section class="view view-quickgaiyou hide">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="margin:0">📄 物件概要書 クイック作成</h2>
+        <p class="desc" style="margin:4px 0 0">土地建物謄本＋レントロールをアップロード → AI自動解析 → 概要書ビューへ。<b style="color:var(--orange)">金額（販売価格・利回り等）は概要書ビューで直接編集</b>します。</p>
+      </div>
+      <button class="btn btn-ghost" data-view="home">← トップに戻る</button>
+    </div>
+
+    <!-- ステップ1：基本情報 -->
+    <div class="card">
+      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ1 — 物件基本情報を入力</h3>
+      <div class="grid grid-2" style="gap:14px">
+        <div>
+          <label>物件種別</label>
+          <select class="fld" id="qgPropType">
+            <option value="一棟マンション/アパート">一棟マンション/アパート</option>
+            <option value="一棟テナント">一棟テナントビル</option>
+            <option value="区分マンション">区分マンション</option>
+            <option value="土地建物">土地建物</option>
+            <option value="土地">土地</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div>
+          <label>物件名</label>
+          <input type="text" class="fld" id="qgName" placeholder="例：マンション大町台" />
+        </div>
+        <div>
+          <label>郵便番号</label>
+          <input type="text" class="fld" id="qgZip" placeholder="例：010-0921" />
+        </div>
+        <div>
+          <label>所在地</label>
+          <input type="text" class="fld" id="qgAddr" placeholder="例：秋田県秋田市大町6丁目3-39" />
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:8px">※ アップロード書類からも自動抽出されます。入力済みは優先されません</div>
+    </div>
+
+    <!-- ステップ2：書類アップロード -->
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ2 — 必要書類をアップロード</h3>
+      <div class="grid grid-2" style="gap:14px">
+        <div>
+          <label style="display:block;margin-bottom:6px"><span style="color:var(--blue);font-weight:700">📄 土地建物謄本</span>（複数選択可）</label>
+          <div class="upload-zone" id="qgDeedZone" style="border:2px dashed rgba(14,165,233,0.4);padding:24px;text-align:center;border-radius:12px;cursor:pointer;background:rgba(14,165,233,0.05)">
+            <div style="font-size:36px">📄</div>
+            <div style="font-size:13px;margin-top:6px;font-weight:600">土地建物謄本をアップロード</div>
+            <div style="font-size:11px;color:var(--sub);margin-top:4px">PDF / JPG / PNG（クリック or ドラッグ&ドロップ）</div>
+            <input type="file" id="qgDeedFile" accept=".pdf,.jpg,.jpeg,.png" multiple class="hide" />
+          </div>
+          <div id="qgDeedFiles" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:6px"><span style="color:var(--orange);font-weight:700">📊 レントロール</span>（複数選択可）</label>
+          <div class="upload-zone" id="qgRrZone" style="border:2px dashed rgba(245,158,11,0.4);padding:24px;text-align:center;border-radius:12px;cursor:pointer;background:rgba(245,158,11,0.05)">
+            <div style="font-size:36px">📊</div>
+            <div style="font-size:13px;margin-top:6px;font-weight:600">レントロールをアップロード</div>
+            <div style="font-size:11px;color:var(--sub);margin-top:4px">PDF / Excel / CSV（クリック or ドラッグ&ドロップ）</div>
+            <input type="file" id="qgRrFile" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" multiple class="hide" />
+          </div>
+          <div id="qgRrFiles" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ステップ3：実行 -->
+    <div class="card" style="margin-top:14px;text-align:center">
+      <h3 style="font-size:15px;color:var(--green);letter-spacing:.1em;margin-bottom:14px">▼ ステップ3 — AI解析と概要書作成</h3>
+      <p class="desc" style="margin:0 0 16px">📄 ボタンをクリックすると、書類からの自動抽出 → 物件登録 → 概要書ビューに移動します。</p>
+      <button class="btn btn-green" id="qgRun" style="font-size:16px;padding:16px 32px;font-weight:700">📄 AI解析 → 物件概要書を作成</button>
+      <div id="qgStatus" style="margin-top:14px;font-size:13px;color:var(--sub)"></div>
+    </div>
+
+    <div style="margin-top:18px;padding:14px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.30);font-size:12px;line-height:1.7">
+      💡 <b>使い方のヒント</b><br>
+      ・最低限の入力は「物件名」と「所在地」のみ。あとは書類から自動抽出<br>
+      ・金額（販売価格・査定価格）は次の <b>概要書ビュー</b> で各セルを直接クリックして入力<br>
+      ・「<b>💾 更新を保存</b>」で物件登録一覧にも反映、全PCで自動同期
+    </div>
+  </section>
+
   <section class="view view-list hide">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
@@ -4775,8 +4864,107 @@ function showView(v){
   $$('.nav-link').forEach(a=>a.classList.toggle('active', a.dataset.view===v));
   if(v==='home') updateHomeStat();
   if(v==='list') renderPropertyList();
+  if(v==='quickgaiyou') bindQuickGaiyou();
   window.scrollTo({top:0,behavior:'instant'});
   document.body.classList.toggle('print-gaiyou', v==='gaiyou');
+}
+
+/* ===== クイック概要書作成：謄本+レントロール→AI解析→物件登録→概要書 ===== */
+let _qgBound = false;
+function bindQuickGaiyou(){
+  if(_qgBound) return; _qgBound = true;
+  const deedFiles = [];
+  const rrFiles = [];
+  function renderChips(arr, container){
+    container.innerHTML = arr.map((f,i)=>`<span class="file-chip">📎 ${f.name} <span style="color:var(--sub)">(${(f.size/1024).toFixed(0)}KB)</span> <button data-idx="${i}" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:0 4px">✕</button></span>`).join('');
+    container.querySelectorAll('button[data-idx]').forEach(btn=>{
+      btn.onclick = (e)=>{
+        const i = Number(btn.dataset.idx);
+        arr.splice(i,1);
+        renderChips(arr, container);
+      };
+    });
+  }
+  function setupZone(zoneId, inputId, arr, container){
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    zone.onclick = ()=>input.click();
+    input.onchange = ()=>{
+      for(const f of input.files) arr.push(f);
+      renderChips(arr, container);
+      input.value = '';
+    };
+    zone.ondragover = (e)=>{ e.preventDefault(); zone.style.background='rgba(14,165,233,0.15)'; };
+    zone.ondragleave = ()=>{ zone.style.background=''; };
+    zone.ondrop = (e)=>{
+      e.preventDefault(); zone.style.background='';
+      for(const f of e.dataTransfer.files) arr.push(f);
+      renderChips(arr, container);
+    };
+  }
+  setupZone('qgDeedZone','qgDeedFile', deedFiles, document.getElementById('qgDeedFiles'));
+  setupZone('qgRrZone','qgRrFile', rrFiles, document.getElementById('qgRrFiles'));
+
+  document.getElementById('qgRun').onclick = async ()=>{
+    const status = document.getElementById('qgStatus');
+    const name = document.getElementById('qgName').value.trim();
+    const addr = document.getElementById('qgAddr').value.trim();
+    if(!name && !addr && !deedFiles.length){
+      showToast('物件名または所在地、もしくは謄本ファイルが必要です','error'); return;
+    }
+
+    status.innerHTML = '<div style="color:var(--blue)">🔄 STATE初期化中…</div>';
+    // STATE をクリアしてシミュレーターのデータを再構築
+    resetSimulatorForm();
+    // 基本情報
+    if(document.getElementById('propType')) document.getElementById('propType').value = document.getElementById('qgPropType').value;
+    if(name) document.getElementById('propName').value = name;
+    if(document.getElementById('qgZip').value) document.getElementById('propZip').value = document.getElementById('qgZip').value;
+    if(addr){
+      // 都道府県＋市区町村を簡易分割
+      const m = addr.match(/^(.+?[都道府県])(.+?[市区町村])?(.*)$/);
+      if(m){
+        if(m[1]) document.getElementById('propPref').value = m[1];
+        if(m[2]) document.getElementById('propCity').value = m[2];
+        if(m[3]) document.getElementById('propAddr').value = m[3].trim();
+      } else {
+        document.getElementById('propAddr').value = addr;
+      }
+    }
+
+    // ファイルをSTATEへ
+    STATE.files.deed = deedFiles.slice();
+    STATE.files.rr = rrFiles.slice();
+
+    // 謄本OCR
+    if(deedFiles.length){
+      status.innerHTML = '<div style="color:var(--blue)">🤖 土地建物謄本をAI解析中…（30秒〜2分）</div>';
+      try{ await document.getElementById('btnOcrBasic').onclick(); }catch(e){ console.warn(e); }
+    }
+    // レントロールOCR
+    if(rrFiles.length){
+      status.innerHTML = '<div style="color:var(--blue)">🤖 レントロールをAI解析中…（30秒〜2分）</div>';
+      try{ await document.getElementById('btnOcrRR').onclick(); }catch(e){ console.warn(e); }
+    }
+
+    status.innerHTML = '<div style="color:var(--blue)">💾 物件を登録中…</div>';
+    try {
+      const entry = saveCurrentProperty();
+      if(entry && entry.id){
+        // 概要書ビューへ遷移＋描画
+        $('#gaiyouContainer').innerHTML = buildGaiyouHTML(entry);
+        bindGaiyouEvents();
+        showView('gaiyou');
+        showToast('✅ 物件概要書を作成しました。金額は各セルをクリックして編集可能です','success');
+        status.innerHTML = '<div style="color:var(--green)">✅ 完了</div>';
+      } else {
+        status.innerHTML = '<div style="color:#ef4444">❌ 物件登録に失敗（物件名または所在地必須）</div>';
+      }
+    } catch(e){
+      status.innerHTML = `<div style="color:#ef4444">❌ ${e.message}</div>`;
+      console.error(e);
+    }
+  };
 }
 
 /* シミュレーターフォームを完全初期化（APIキー・登録物件は保持） */
