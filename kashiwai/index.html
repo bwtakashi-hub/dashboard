@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<title>📌 柏井メモ</title>
+
+<!-- ===== PWA ===== -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16213e">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="柏井メモ">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { font-size: 18px; }            /* 基準を大きめに */
+body {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Noto Sans JP', sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  height: 100vh;
+  height: 100dvh;                    /* スマホのアドレスバー対応 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* セーフエリア（ノッチ）対応 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ヘッダー */
+#header {
+  background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+  padding: 14px 16px;
+  border-bottom: 2px solid #e94560;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 12px rgba(233,69,96,0.25);
+  z-index: 100;
+  flex-shrink: 0;
+}
+#hamburger {
+  background: none; border: none; color: #eee;
+  font-size: 28px; cursor: pointer; padding: 2px 8px; line-height: 1;
+}
+#app-title {
+  font-size: 24px; font-weight: 800; color: #e94560;
+  white-space: nowrap; letter-spacing: 0.05em;
+}
+#search {
+  flex: 1; background: #0a1628; border: 1px solid #2a3a5c;
+  border-radius: 22px; padding: 10px 18px; color: #eee;
+  font-size: 18px; outline: none; max-width: 320px; margin-left: 10px;
+}
+#search::placeholder { color: #556; }
+#header-actions { display: flex; gap: 6px; margin-left: 6px; flex-wrap: wrap; }
+.header-btn {
+  background: #1a2a4a; border: 1px solid #2a3a5c; border-radius: 8px;
+  color: #bcd; padding: 9px 14px; font-size: 15px; cursor: pointer;
+  white-space: nowrap; transition: background 0.15s; font-family: inherit;
+}
+.header-btn:hover { background: #2a3a6a; color: #fff; }
+.header-btn.view-active { background: #e94560; border-color: #e94560; color: #fff; }
+
+/* メインレイアウト */
+#main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+/* サイドバー */
+#sidebar {
+  width: 230px; background: #0f2027;
+  border-right: 1px solid #1e2d4a;
+  display: flex; flex-direction: column;
+  flex-shrink: 0; overflow-y: auto;
+  transition: width 0.2s, transform 0.25s, padding 0.2s;
+}
+#sidebar.collapsed { width: 0; overflow: hidden; }
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: #0f2027; }
+#sidebar::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 2px; }
+
+.sidebar-section { padding: 8px 0; border-bottom: 1px solid #1e2d4a; }
+.sidebar-item {
+  display: flex; align-items: center; padding: 13px 16px;
+  cursor: pointer; color: #8899aa; font-size: 17px; gap: 9px;
+  transition: background 0.15s; position: relative; user-select: none;
+}
+.sidebar-item:hover { background: #162030; color: #eee; }
+.sidebar-item.active { background: #1e3050; color: #e94560; font-weight: 700; }
+.sidebar-badge {
+  margin-left: auto; background: #2a3a5c; color: #8899aa;
+  font-size: 13px; padding: 2px 9px; border-radius: 10px; min-width: 24px; text-align: center;
+}
+.sidebar-item.active .sidebar-badge { background: #e94560; color: #fff; }
+.sidebar-folder-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.folder-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; margin-left: auto; }
+.sidebar-item:hover .folder-actions { opacity: 1; }
+.sidebar-item.active .folder-actions { opacity: 1; }
+.folder-action-btn {
+  background: none; border: none; color: #8899aa; font-size: 14px;
+  cursor: pointer; padding: 4px 7px; border-radius: 4px; line-height: 1;
+}
+.folder-action-btn:hover { background: #2a3a5c; color: #eee; }
+#add-folder-btn {
+  display: flex; align-items: center; padding: 12px 16px;
+  cursor: pointer; color: #667; font-size: 16px; gap: 6px;
+  transition: color 0.15s;
+}
+#add-folder-btn:hover { color: #e94560; }
+
+/* サイドバー背景（モバイルのドロワー時のみ表示） */
+#sidebar-backdrop {
+  display: none; position: absolute; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 400;
+}
+
+/* コンテンツ */
+#content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+#notes-container {
+  flex: 1 1 auto; overflow-y: auto; padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+#notes-container::-webkit-scrollbar { width: 6px; }
+#notes-container::-webkit-scrollbar-track { background: #1a1a2e; }
+#notes-container::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 3px; }
+
+/* グリッドモード */
+#notes-container.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px; align-content: start;
+}
+/* リストモード */
+#notes-container.list-mode {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* カード共通 */
+.note-card {
+  border-radius: 14px; padding: 15px;
+  display: flex; flex-direction: column; gap: 9px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: box-shadow 0.2s, transform 0.15s;
+  animation: fadeIn 0.2s ease;
+  border-width: 2px; border-style: solid;
+}
+.note-card:hover { box-shadow: 0 5px 18px rgba(0,0,0,0.4); transform: translateY(-2px); }
+.note-card.pinned { box-shadow: 0 0 14px rgba(233,69,96,0.55); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-top { display: flex; align-items: center; gap: 4px; }
+.card-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; padding: 4px 6px; border-radius: 4px;
+  line-height: 1; opacity: 0.45; transition: opacity 0.15s;
+}
+.card-btn:hover { opacity: 1; }
+.card-btn.on { opacity: 1; }
+.card-folder-tag {
+  font-size: 13px; padding: 3px 10px; border-radius: 10px;
+  margin-left: auto; font-weight: 600;
+}
+.card-text {
+  font-size: 21px; line-height: 1.7;
+  white-space: pre-wrap; word-break: break-word;
+  color: #1a1a2e; cursor: text; min-height: 26px;
+}
+.card-edit-ta {
+  font-size: 21px; line-height: 1.7; resize: vertical; outline: none;
+  font-family: inherit; color: #222; width: 100%;
+  border-radius: 6px; padding: 6px 9px;
+  background: rgba(255,255,255,0.55); border: 1px solid rgba(0,0,0,0.2);
+}
+.card-date { font-size: 13px; color: rgba(0,0,0,0.42); }
+
+/* タスクカード */
+.task-card-title { font-size: 20px; font-weight: 700; color: #1a1a2e; }
+.task-card-prog { font-size: 14px; color: rgba(0,0,0,0.45); margin-top: -4px; }
+.task-list { display: flex; flex-direction: column; gap: 7px; }
+.task-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; color: #1a1a2e; cursor: pointer;
+}
+.task-row input[type=checkbox] { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; accent-color: #e94560; }
+.task-row.done span { text-decoration: line-through; color: rgba(0,0,0,0.40); }
+
+/* リストカード */
+.note-card.list-card {
+  border-radius: 10px; flex-direction: row;
+  align-items: center; gap: 12px;
+  border-left-width: 6px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  border-right: 1px solid rgba(0,0,0,0.08);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 14px 16px; transform: none !important;
+}
+.note-card.list-card:hover { transform: none !important; }
+.list-text {
+  flex: 1; font-size: 20px; color: #1a1a2e;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; line-height: 1.5;
+}
+.list-text.expanded { white-space: pre-wrap; overflow: visible; }
+.list-meta { font-size: 13px; color: rgba(0,0,0,0.42); white-space: nowrap; text-align: right; line-height: 1.6; }
+.list-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+/* 入力エリア */
+#add-area {
+  background: #16213e; border-top: 2px solid #1e2d4a;
+  padding: 12px 16px;
+  flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden;
+}
+.add-tabs { display: flex; gap: 4px; margin-bottom: 9px; }
+.add-tab {
+  padding: 8px 20px; border-radius: 8px 8px 0 0; border: none;
+  background: #0f2027; color: #8899aa; font-size: 16px;
+  cursor: pointer; font-family: inherit; transition: background 0.15s;
+}
+.add-tab.active { background: #1e3050; color: #e94560; font-weight: 700; }
+
+#add-note-panel, #add-task-panel { display: none; }
+#add-note-panel.show, #add-task-panel.show {
+  display: flex; flex-direction: column; gap: 9px;
+}
+
+#new-text {
+  width: 100%; border-radius: 10px; padding: 12px 13px;
+  font-size: 20px; resize: vertical; outline: none; line-height: 1.6;
+  font-family: inherit; border: 2px solid #F9E04B; background: #FFF9C4;
+  color: #222; transition: border-color 0.2s, background 0.2s;
+  min-height: 70px;
+}
+#add-controls {
+  display: flex; flex-direction: row; align-items: center;
+  gap: 12px; flex-shrink: 0; flex-wrap: wrap;
+}
+#color-picker { display: flex; gap: 7px; }
+.color-dot {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.15s;
+}
+.color-dot.active { transform: scale(1.35); border-color: #e94560 !important; }
+
+select.add-sel {
+  background: #0a1628; border: 1px solid #2a3a5c; border-radius: 8px;
+  padding: 9px 11px; color: #eee; font-size: 16px; outline: none; font-family: inherit;
+}
+
+.add-main-btn {
+  background: #e94560; border: none; border-radius: 10px;
+  color: #fff; padding: 12px 24px; font-size: 17px; font-weight: 700;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.add-main-btn:hover { background: #c73652; }
+
+/* タスク追加 */
+#task-title-input {
+  width: 100%; border-radius: 10px; padding: 12px 13px;
+  font-size: 20px; outline: none; font-family: inherit;
+  border: 2px solid #5DADE2; background: #D6EAF8; color: #222;
+}
+#task-items-wrap { display: flex; flex-direction: column; gap: 6px; max-height: 30vh; overflow-y: auto; }
+#task-add-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.task-input-row { display: flex; align-items: center; gap: 6px; }
+.task-item-inp {
+  flex: 1; border: 1px solid #2a3a5c; border-radius: 8px; padding: 10px 11px;
+  font-size: 17px; background: #0a1628; color: #eee; outline: none; font-family: inherit;
+}
+#add-task-row-btn {
+  background: none; border: 1px dashed #2a3a5c; border-radius: 8px;
+  color: #8899aa; padding: 8px 12px; cursor: pointer; font-size: 16px;
+  font-family: inherit; transition: color 0.15s, border-color 0.15s;
+}
+#add-task-row-btn:hover { color: #e94560; border-color: #e94560; }
+.rm-task-row {
+  background: none; border: none; color: #c77; font-size: 22px;
+  cursor: pointer; padding: 0 6px; line-height: 1;
+}
+
+#empty-msg {
+  color: #556; text-align: center; padding: 60px 20px;
+  font-size: 19px; grid-column: 1 / -1;
+}
+
+/* ===== 編集モーダル ===== */
+#edit-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.78); z-index: 2000;
+  align-items: center; justify-content: center;
+  padding: 14px;
+}
+#edit-overlay.show { display: flex; }
+#edit-box {
+  background: #16213e; border: 1px solid #2a3a5c;
+  border-radius: 16px; width: 100%; max-width: 720px; height: 86vh;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: fadeIn 0.18s ease;
+}
+#edit-header {
+  padding: 15px 18px; border-bottom: 1px solid #2a3a5c;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  background: #0f2027; flex-wrap: wrap;
+}
+#edit-folder-tag {
+  font-size: 14px; padding: 4px 12px; border-radius: 12px; font-weight: 700;
+}
+#edit-date { font-size: 13px; color: #8899aa; }
+#edit-color-picker { display: flex; gap: 6px; margin-left: auto; }
+.edit-cdot {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.15s; flex-shrink: 0;
+}
+.edit-cdot.active { transform: scale(1.3); border-color: #e94560 !important; }
+#edit-close {
+  background: none; border: none; color: #8899aa;
+  font-size: 28px; cursor: pointer; padding: 2px 8px; line-height: 1; flex-shrink: 0;
+}
+#edit-close:hover { color: #e94560; }
+
+#edit-body {
+  flex: 1; padding: 18px 20px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 10px;
+}
+#edit-textarea {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #eee; font-size: 22px; line-height: 1.8; resize: none;
+  font-family: inherit; word-break: break-word;
+}
+#edit-textarea::placeholder { color: #445; }
+
+/* タスク編集 */
+#edit-task-area {
+  display: none; flex-direction: column; flex: 1; overflow: hidden; gap: 10px;
+}
+#edit-task-area.show { display: flex; }
+#edit-task-title-inp {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 2px solid #2a3a5c; outline: none;
+  color: #eee; font-size: 23px; font-weight: 700;
+  padding: 0 0 9px; font-family: inherit; flex-shrink: 0;
+}
+#edit-task-title-inp:focus { border-bottom-color: #e94560; }
+#edit-task-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
+.et-row { display: flex; align-items: center; gap: 11px; }
+.et-cb { width: 24px; height: 24px; accent-color: #e94560; flex-shrink: 0; cursor: pointer; }
+.et-inp {
+  flex: 1; background: #0a1628; border: 1px solid #2a3a5c; border-radius: 8px;
+  padding: 10px 12px; color: #eee; font-size: 18px; outline: none; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.et-inp:focus { border-color: #5DADE2; }
+.et-inp.done-inp { text-decoration: line-through; color: #556; }
+.et-rm { background: none; border: none; color: #c77; font-size: 22px; cursor: pointer; padding: 0 6px; line-height: 1; }
+#edit-add-task-row {
+  background: none; border: 1px dashed #2a3a5c; border-radius: 8px;
+  color: #8899aa; padding: 9px 16px; cursor: pointer; font-size: 16px;
+  font-family: inherit; align-self: flex-start; flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+#edit-add-task-row:hover { color: #e94560; border-color: #e94560; }
+
+#edit-footer {
+  padding: 13px 20px; border-top: 1px solid #2a3a5c;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  background: #0f2027; flex-wrap: wrap;
+}
+#edit-folder-sel {
+  background: #0a1628; border: 1px solid #2a3a5c; border-radius: 8px;
+  padding: 9px 12px; color: #eee; font-size: 16px; outline: none; font-family: inherit;
+}
+#edit-del-btn {
+  background: none; border: 1px solid #c77; border-radius: 8px;
+  color: #c77; padding: 10px 16px; font-size: 16px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s;
+}
+#edit-del-btn:hover { background: #c77; color: #fff; }
+#edit-save-btn {
+  background: #e94560; border: none; border-radius: 10px;
+  color: #fff; padding: 11px 28px; font-size: 17px; font-weight: 700;
+  cursor: pointer; font-family: inherit; margin-left: auto;
+  transition: background 0.15s;
+}
+#edit-save-btn:hover { background: #c73652; }
+
+/* フォルダモーダル */
+#modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65); z-index: 1000;
+  align-items: center; justify-content: center; padding: 14px;
+}
+#modal-overlay.show { display: flex; }
+#modal-box {
+  background: #16213e; border: 1px solid #2a3a5c;
+  border-radius: 14px; padding: 24px 26px; min-width: 290px; width: 100%; max-width: 420px;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.55);
+}
+#modal-box h3 { font-size: 20px; margin-bottom: 16px; color: #e94560; }
+#modal-name {
+  width: 100%; background: #0a1628; border: 1px solid #2a3a5c;
+  border-radius: 8px; padding: 12px 13px; color: #eee; font-size: 17px;
+  outline: none; font-family: inherit; margin-bottom: 14px;
+}
+#modal-colors { display: flex; gap: 11px; margin-bottom: 18px; }
+.modal-color-dot {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.15s;
+}
+.modal-color-dot.active { transform: scale(1.3); border-color: #e94560 !important; }
+#modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-btn { padding: 11px 22px; border-radius: 9px; border: none; font-size: 16px; cursor: pointer; font-family: inherit; }
+#modal-cancel { background: #2a3a5c; color: #eee; }
+#modal-save { background: #e94560; color: #fff; font-weight: 700; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 3px; }
+
+/* ============================================================
+   スマホ最適化（タッチ・全画面・大きな文字）
+   ============================================================ */
+@media (max-width: 768px) {
+  html { font-size: 18px; }
+  #header { padding: 12px 14px; gap: 8px; }
+  #app-title { font-size: 22px; }
+  /* スマホでは検索を一段下げず、ヘッダー内で省スペースに */
+  #search { font-size: 17px; padding: 9px 14px; margin-left: 6px; min-width: 0; }
+  #header-actions { display: none; }   /* ボタン群はサイドバー側に集約 */
+
+  /* サイドバーをスライド式ドロワーに */
+  #sidebar {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 80vw; max-width: 320px; z-index: 500;
+    transform: translateX(0);
+    box-shadow: 6px 0 28px rgba(0,0,0,0.55);
+  }
+  #sidebar.collapsed { width: 80vw; transform: translateX(-105%); box-shadow: none; }
+  #sidebar.collapsed ~ #sidebar-backdrop { display: none; }
+  #sidebar:not(.collapsed) ~ #content-area #sidebar-backdrop { display: block; }
+
+  .sidebar-item { padding: 15px 18px; font-size: 18px; }
+
+  /* グリッドはスマホでは1〜2列 */
+  #notes-container { padding: 14px; }
+  #notes-container.grid-mode {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .card-text { font-size: 20px; }
+  .list-text { font-size: 19px; }
+  .task-row { font-size: 19px; }
+
+  /* 入力エリアはコンパクトに */
+  #add-area { padding: 10px 12px; }
+  #new-text { min-height: 56px; font-size: 19px; }
+  #add-controls, #task-add-controls { gap: 8px; }
+  .add-main-btn { padding: 11px 18px; }
+
+  /* タッチターゲットを大きく */
+  .card-btn { font-size: 22px; padding: 6px 8px; opacity: 0.6; }
+  .folder-actions { opacity: 1 !important; }
+}
+
+/* 極小画面 */
+@media (max-width: 380px) {
+  #notes-container.grid-mode { grid-template-columns: 1fr; }
+  #app-title { font-size: 20px; }
+}
+
+/* ============================================================
+   ライトモード自動対応（端末が明るい設定のとき）
+   ============================================================ */
+@media (prefers-color-scheme: light) {
+  body { background: #eef1f6; color: #1a1a2e; }
+  #header {
+    background: linear-gradient(135deg, #2E4057 0%, #3a5a86 100%);
+    border-bottom: 2px solid #e94560;
+  }
+  #search { background: #ffffff; border-color: #c3ccdb; color: #1a1a2e; }
+  #search::placeholder { color: #99a; }
+  .header-btn { background: #f2f5fa; border-color: #c3ccdb; color: #2E4057; }
+  #sidebar { background: #ffffff; border-right: 1px solid #d6deea; }
+  .sidebar-item { color: #5a6b80; }
+  .sidebar-item:hover { background: #eef3fa; color: #1a1a2e; }
+  .sidebar-item.active { background: #fde3e8; color: #e94560; }
+  .sidebar-badge { background: #e2e8f2; color: #5a6b80; }
+  #notes-container { background: #eef1f6; }
+  #notes-container::-webkit-scrollbar-track { background: #eef1f6; }
+  #empty-msg { color: #99a; }
+  #add-area { background: #ffffff; border-top: 2px solid #d6deea; }
+  .add-tab { background: #eef3fa; color: #5a6b80; }
+  .add-tab.active { background: #fde3e8; color: #e94560; }
+  select.add-sel { background: #f2f5fa; border-color: #c3ccdb; color: #1a1a2e; }
+  .task-item-inp { background: #f2f5fa; border-color: #c3ccdb; color: #1a1a2e; }
+  #list-bar { background: #f4f7fb !important; border-bottom: 1px solid #d6deea !important; }
+  #list-count-label { color: #5a6b80 !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div id="header">
+  <button id="hamburger">☰</button>
+  <span id="app-title">📌 柏井メモ</span>
+  <input id="search" type="text" placeholder="🔍 検索...">
+  <div id="header-actions">
+    <button class="header-btn view-active" id="btn-grid">🗂️ 付箋</button>
+    <button class="header-btn" id="btn-list">≡ 一覧</button>
+    <button class="header-btn" id="btn-clipboard">📋 貼付</button>
+    <button class="header-btn" id="btn-file">📂 読込</button>
+    <input type="file" id="file-input" accept=".txt,.md" multiple style="display:none">
+  </div>
+</div>
+
+<div id="main-container">
+
+  <!-- サイドバー -->
+  <div id="sidebar" class="collapsed">
+    <div class="sidebar-section">
+      <div class="sidebar-item active" data-f="all">
+        <span>📋</span><span>すべて</span>
+        <span class="sidebar-badge" id="b-all">0</span>
+      </div>
+      <div class="sidebar-item" data-f="favorites">
+        <span>⭐</span><span>お気に入り</span>
+        <span class="sidebar-badge" id="b-fav">0</span>
+      </div>
+      <div class="sidebar-item" data-f="tasks">
+        <span>✅</span><span>タスク</span>
+        <span class="sidebar-badge" id="b-task">0</span>
+      </div>
+    </div>
+    <!-- スマホ用: ヘッダーから隠したボタンをここに -->
+    <div class="sidebar-section" id="mobile-actions">
+      <div class="sidebar-item" id="m-grid"><span>🗂️</span><span>付箋表示</span></div>
+      <div class="sidebar-item" id="m-list"><span>≡</span><span>一覧表示</span></div>
+      <div class="sidebar-item" id="m-clipboard"><span>📋</span><span>貼り付けて追加</span></div>
+      <div class="sidebar-item" id="m-file"><span>📂</span><span>ファイル読込</span></div>
+    </div>
+    <div class="sidebar-section" style="flex:1;">
+      <div id="folder-list"></div>
+      <div id="add-folder-btn">＋ フォルダ追加</div>
+    </div>
+  </div>
+
+  <!-- コンテンツ -->
+  <div id="content-area">
+    <div id="sidebar-backdrop"></div>
+
+    <!-- 一覧バー -->
+    <div id="list-bar" style="
+      display:flex; align-items:center; gap:8px;
+      padding:8px 16px; background:#12192e;
+      border-bottom:1px solid #1e2d4a; flex-shrink:0;
+    ">
+      <span style="font-size:15px;color:#8899aa;" id="list-count-label">0件</span>
+      <div style="margin-left:auto;display:flex;gap:4px;">
+        <button class="header-btn view-active" id="bar-grid" style="padding:7px 14px;font-size:14px;">🗂️ 付箋</button>
+        <button class="header-btn" id="bar-list" style="padding:7px 14px;font-size:14px;">≡ 一覧</button>
+      </div>
+    </div>
+
+    <div id="notes-container" class="grid-mode">
+      <div id="empty-msg">メモがありません。下から追加してください。</div>
+    </div>
+
+    <!-- 入力エリア -->
+    <div id="add-area">
+      <div class="add-tabs">
+        <button class="add-tab active" data-tab="note">📝 メモ</button>
+        <button class="add-tab" data-tab="task">✅ タスク</button>
+      </div>
+
+      <div id="add-note-panel" class="show">
+        <textarea id="new-text" rows="2" placeholder="新しいメモを入力... (Ctrl+Enter で追加)"></textarea>
+        <div id="add-controls">
+          <div id="color-picker"></div>
+          <select class="add-sel" id="folder-sel"></select>
+          <button class="add-main-btn" id="add-note-btn">＋ 追加</button>
+        </div>
+      </div>
+
+      <div id="add-task-panel">
+        <input id="task-title-input" type="text" placeholder="タスクのタイトル（例：会議準備）">
+        <div id="task-items-wrap">
+          <div class="task-input-row">
+            <input type="text" class="task-item-inp" placeholder="タスク項目を入力">
+          </div>
+          <button id="add-task-row-btn">＋ 項目を追加</button>
+        </div>
+        <div id="task-add-controls">
+          <select class="add-sel" id="task-folder-sel"></select>
+          <button class="add-main-btn" id="add-task-btn">＋ 追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 編集モーダル ===== -->
+<div id="edit-overlay">
+  <div id="edit-box">
+    <div id="edit-header">
+      <span id="edit-folder-tag"></span>
+      <span id="edit-date"></span>
+      <div id="edit-color-picker"></div>
+      <button id="edit-close" title="閉じる（Esc）">✕</button>
+    </div>
+    <div id="edit-body">
+      <!-- メモ -->
+      <textarea id="edit-textarea" placeholder="メモを入力..."></textarea>
+      <!-- タスク -->
+      <div id="edit-task-area">
+        <input id="edit-task-title-inp" type="text" placeholder="タスクのタイトル">
+        <div id="edit-task-list"></div>
+        <button id="edit-add-task-row">＋ タスクを追加</button>
+      </div>
+    </div>
+    <div id="edit-footer">
+      <select id="edit-folder-sel"></select>
+      <button id="edit-del-btn">🗑️ 削除</button>
+      <button id="edit-save-btn">💾 保存（Ctrl+Enter）</button>
+    </div>
+  </div>
+</div>
+
+<!-- フォルダモーダル -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h3 id="modal-title">フォルダを追加</h3>
+    <input id="modal-name" type="text" placeholder="フォルダ名を入力">
+    <div id="modal-colors"></div>
+    <div id="modal-actions">
+      <button class="modal-btn" id="modal-cancel">キャンセル</button>
+      <button class="modal-btn" id="modal-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SKEY = "kashiwai-memo-v1";
+const COLORS = [
+  { bg:"#FFF9C4", bd:"#F9E04B" },
+  { bg:"#C8F7C5", bd:"#5ECC6F" },
+  { bg:"#D6EAF8", bd:"#5DADE2" },
+  { bg:"#FDEDEC", bd:"#F1948A" },
+  { bg:"#F5EEF8", bd:"#C39BD3" },
+  { bg:"#FEF5E7", bd:"#F0B27A" },
+];
+const FCOLORS = ["#1565c0","#2e7d32","#e94560","#6a1b9a","#e65100","#795548"];
+
+let S = { folders:[{id:"f0",name:"未分類",color:"#555"}], notes:[], viewMode:"grid", activeFolder:"all" };
+let selColor = 0;
+let modalColorIdx = 0;
+let modalEditId = null;
+let q = "";
+
+/* -------- 初期化 -------- */
+function init() {
+  // localStorageからデータを確実に復元
+  const raw = localStorage.getItem(SKEY);
+  if (raw) {
+    try {
+      const d = JSON.parse(raw);
+      if (d && typeof d === 'object') {
+        if (Array.isArray(d.notes))                      S.notes        = d.notes;
+        if (Array.isArray(d.folders) && d.folders.length) S.folders      = d.folders;
+        if (d.viewMode)                                   S.viewMode     = d.viewMode;
+        if (d.activeFolder)                               S.activeFolder = d.activeFolder;
+      }
+    } catch(e) { console.warn('[柏井メモ] データ読み込みエラー:', e); }
+  }
+  if (!S.folders || !S.folders.length) S.folders=[{id:"f0",name:"未分類",color:"#555"}];
+  buildColorPicker();
+  buildModalColors();
+  setupTabs();
+  setupSidebarClicks();
+  renderSidebar();
+  refreshFolderSels();
+  applyViewMode();
+  render();
+}
+
+// 保存（エラーハンドリング付き）
+function save(){
+  try {
+    localStorage.setItem(SKEY, JSON.stringify(S));
+  } catch(e) {
+    console.warn('[柏井メモ] 保存エラー:', e);
+    alert('⚠️ 保存に失敗しました。ストレージ容量を確認してください。');
+  }
+}
+
+// ブラウザ更新・閉じる前に必ず保存
+window.addEventListener('beforeunload', () => save());
+
+function gid(){ return Date.now()+Math.floor(Math.random()*9999); }
+
+/* -------- カラーピッカー -------- */
+function buildColorPicker(){
+  const wrap = document.getElementById("color-picker");
+  COLORS.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="color-dot"+(i===0?" active":"");
+    d.style.background=c.bg; d.style.borderColor=c.bd;
+    d.onclick=()=>{
+      selColor=i;
+      wrap.querySelectorAll(".color-dot").forEach((x,j)=>x.classList.toggle("active",j===i));
+      const ta=document.getElementById("new-text");
+      ta.style.background=COLORS[i].bg; ta.style.borderColor=COLORS[i].bd;
+    };
+    wrap.appendChild(d);
+  });
+}
+function buildModalColors(){
+  const wrap=document.getElementById("modal-colors");
+  FCOLORS.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="modal-color-dot"+(i===0?" active":"");
+    d.style.background=c;
+    d.onclick=()=>{
+      modalColorIdx=i;
+      wrap.querySelectorAll(".modal-color-dot").forEach((x,j)=>x.classList.toggle("active",j===i));
+    };
+    wrap.appendChild(d);
+  });
+}
+
+/* -------- タブ -------- */
+function setupTabs(){
+  document.querySelectorAll(".add-tab").forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll(".add-tab").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const t=btn.dataset.tab;
+      document.getElementById("add-note-panel").classList.toggle("show",t==="note");
+      document.getElementById("add-task-panel").classList.toggle("show",t==="task");
+    };
+  });
+}
+
+/* -------- サイドバー -------- */
+function setupSidebarClicks(){
+  document.querySelectorAll(".sidebar-item[data-f]").forEach(el=>{
+    el.onclick=()=>{ setActiveFolder(el.dataset.f); closeSidebarOnMobile(); };
+  });
+}
+function setActiveFolder(id){
+  S.activeFolder=id; save(); renderSidebar(); render();
+}
+function renderSidebar(){
+  document.getElementById("b-all").textContent=S.notes.length;
+  document.getElementById("b-fav").textContent=S.notes.filter(n=>n.favorite).length;
+  document.getElementById("b-task").textContent=S.notes.filter(n=>n.type==="task").length;
+  ["all","favorites","tasks"].forEach(id=>{
+    const el=document.querySelector(`.sidebar-item[data-f="${id}"]`);
+    if(el) el.classList.toggle("active",S.activeFolder===id);
+  });
+
+  const list=document.getElementById("folder-list");
+  list.innerHTML="";
+  S.folders.forEach(f=>{
+    const cnt=S.notes.filter(n=>n.folderId===f.id).length;
+    const item=document.createElement("div");
+    item.className="sidebar-item"+(S.activeFolder===f.id?" active":"");
+    item.innerHTML=`
+      <div class="sidebar-folder-dot" style="background:${f.color}"></div>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;">${esc(f.name)}</span>
+      <span class="sidebar-badge">${cnt}</span>
+      <div class="folder-actions">
+        <button class="folder-action-btn" title="編集" data-eid="${f.id}">✏️</button>
+        <button class="folder-action-btn" title="削除" data-did="${f.id}">🗑️</button>
+      </div>`;
+    item.onclick=(e)=>{ if(e.target.closest(".folder-actions")) return; setActiveFolder(f.id); closeSidebarOnMobile(); };
+    item.querySelector("[data-eid]").onclick=(e)=>{ e.stopPropagation(); openModal("edit",f); };
+    item.querySelector("[data-did]").onclick=(e)=>{ e.stopPropagation(); delFolder(f.id); };
+    list.appendChild(item);
+  });
+}
+function delFolder(id){
+  if(!confirm("フォルダを削除しますか？\n中のメモは「未分類」に移動します。")) return;
+  S.notes.forEach(n=>{ if(n.folderId===id) n.folderId="f0"; });
+  S.folders=S.folders.filter(f=>f.id!==id);
+  if(S.activeFolder===id) S.activeFolder="all";
+  save(); renderSidebar(); refreshFolderSels(); render();
+}
+
+/* -------- フォルダSELECT -------- */
+function refreshFolderSels(){
+  const opts=S.folders.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join("");
+  document.getElementById("folder-sel").innerHTML=opts;
+  document.getElementById("task-folder-sel").innerHTML=opts;
+}
+
+/* -------- メモ追加 -------- */
+document.getElementById("add-note-btn").onclick=addNote;
+document.getElementById("new-text").onkeydown=e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)) addNote(); };
+function addNote(){
+  const text=document.getElementById("new-text").value.trim();
+  if(!text) return;
+  const folderId=document.getElementById("folder-sel").value||S.folders[0]?.id;
+  S.notes.unshift({id:gid(),type:"note",text,colorIdx:selColor,folderId,favorite:false,pinned:false,createdAt:Date.now(),updatedAt:Date.now()});
+  save(); document.getElementById("new-text").value="";
+  renderSidebar(); render();
+}
+
+/* -------- タスク追加 -------- */
+document.getElementById("add-task-row-btn").onclick=()=>{
+  const row=document.createElement("div"); row.className="task-input-row";
+  row.innerHTML=`<input type="text" class="task-item-inp" placeholder="タスク項目を入力"><button class="rm-task-row" type="button">✕</button>`;
+  row.querySelector(".rm-task-row").onclick=()=>row.remove();
+  document.getElementById("add-task-row-btn").before(row);
+};
+document.getElementById("add-task-btn").onclick=()=>{
+  const title=document.getElementById("task-title-input").value.trim()||"タスク";
+  const tasks=Array.from(document.querySelectorAll(".task-item-inp"))
+    .map((inp,i)=>({id:i+1,text:inp.value.trim(),done:false}))
+    .filter(t=>t.text);
+  if(!tasks.length){alert("タスク項目を1つ以上入力してください");return;}
+  const folderId=document.getElementById("task-folder-sel").value||S.folders[0]?.id;
+  S.notes.unshift({id:gid(),type:"task",title,tasks,colorIdx:2,folderId,favorite:false,pinned:false,createdAt:Date.now(),updatedAt:Date.now()});
+  save();
+  document.getElementById("task-title-input").value="";
+  document.querySelectorAll(".task-item-inp").forEach((inp,i)=>{ if(i>0) inp.closest(".task-input-row").remove(); else inp.value=""; });
+  renderSidebar(); render();
+};
+
+/* -------- 表示モード -------- */
+function setViewMode(mode){
+  S.viewMode=mode; save(); applyViewMode(); render();
+}
+document.getElementById("btn-grid").onclick=()=>setViewMode("grid");
+document.getElementById("btn-list").onclick=()=>setViewMode("list");
+document.getElementById("bar-grid").onclick=()=>setViewMode("grid");
+document.getElementById("bar-list").onclick=()=>setViewMode("list");
+function applyViewMode(){
+  const isGrid=S.viewMode==="grid";
+  document.getElementById("btn-grid").classList.toggle("view-active",isGrid);
+  document.getElementById("btn-list").classList.toggle("view-active",!isGrid);
+  document.getElementById("bar-grid").classList.toggle("view-active",isGrid);
+  document.getElementById("bar-list").classList.toggle("view-active",!isGrid);
+  document.getElementById("notes-container").className=isGrid?"grid-mode":"list-mode";
+}
+
+/* -------- ハンバーガー -------- */
+document.getElementById("hamburger").onclick=()=>document.getElementById("sidebar").classList.toggle("collapsed");
+
+/* -------- 検索 -------- */
+document.getElementById("search").oninput=e=>{ q=e.target.value.toLowerCase(); render(); };
+
+/* -------- クリップボード -------- */
+document.getElementById("btn-clipboard").onclick=async()=>{
+  try{
+    const text=await navigator.clipboard.readText();
+    if(!text.trim()){alert("クリップボードにテキストがありません");return;}
+    const folderId=document.getElementById("folder-sel").value||S.folders[0]?.id;
+    S.notes.unshift({id:gid(),type:"note",text:text.trim(),colorIdx:selColor,folderId,favorite:false,pinned:false,createdAt:Date.now(),updatedAt:Date.now()});
+    save(); renderSidebar(); render();
+  }catch(e){alert("クリップボード読み取りに失敗しました\nブラウザの許可が必要です");}
+};
+
+/* -------- ファイル読み込み -------- */
+document.getElementById("btn-file").onclick=()=>document.getElementById("file-input").click();
+document.getElementById("file-input").onchange=e=>{
+  const folderId=document.getElementById("folder-sel").value||S.folders[0]?.id;
+  Array.from(e.target.files).forEach(file=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      const text=ev.target.result.trim();
+      if(!text) return;
+      S.notes.unshift({id:gid(),type:"note",text,colorIdx:selColor,folderId,favorite:false,pinned:false,createdAt:Date.now(),updatedAt:Date.now()});
+      save(); renderSidebar(); render();
+    };
+    r.readAsText(file,"utf-8");
+  });
+  e.target.value="";
+};
+
+/* -------- フォルダモーダル -------- */
+document.getElementById("add-folder-btn").onclick=()=>openModal("add");
+document.getElementById("modal-cancel").onclick=closeModal;
+document.getElementById("modal-overlay").onclick=e=>{ if(e.target===document.getElementById("modal-overlay")) closeModal(); };
+document.getElementById("modal-save").onclick=()=>{
+  const name=document.getElementById("modal-name").value.trim();
+  if(!name) return;
+  const color=FCOLORS[modalColorIdx];
+  if(modalEditId){
+    const f=S.folders.find(f=>f.id===modalEditId);
+    if(f){f.name=name;f.color=color;}
+  } else {
+    S.folders.push({id:"f"+gid(),name,color});
+  }
+  save(); renderSidebar(); refreshFolderSels(); closeModal();
+};
+function openModal(mode,folder=null){
+  modalEditId=folder?.id||null;
+  document.getElementById("modal-title").textContent=mode==="add"?"フォルダを追加":"フォルダを編集";
+  document.getElementById("modal-name").value=folder?.name||"";
+  const ci=folder?FCOLORS.indexOf(folder.color):0;
+  modalColorIdx=ci>=0?ci:0;
+  document.querySelectorAll(".modal-color-dot").forEach((d,i)=>d.classList.toggle("active",i===modalColorIdx));
+  document.getElementById("modal-overlay").classList.add("show");
+  setTimeout(()=>document.getElementById("modal-name").focus(),50);
+}
+function closeModal(){ document.getElementById("modal-overlay").classList.remove("show"); }
+
+/* -------- メイン描画 -------- */
+function render(){
+  const container=document.getElementById("notes-container");
+  let filtered=S.notes.filter(n=>{
+    if(q){
+      const hay=(n.text||"")+" "+(n.title||"")+" "+((n.tasks||[]).map(t=>t.text).join(" "));
+      if(!hay.toLowerCase().includes(q)) return false;
+    }
+    if(S.activeFolder==="favorites") return n.favorite;
+    if(S.activeFolder==="tasks") return n.type==="task";
+    if(S.activeFolder!=="all") return n.folderId===S.activeFolder;
+    return true;
+  });
+  filtered.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||(b.favorite?1:0)-(a.favorite?1:0)||b.updatedAt-a.updatedAt);
+
+  container.querySelectorAll(".note-card").forEach(el=>el.remove());
+  const emEl=document.getElementById("empty-msg");
+  document.getElementById("list-count-label").textContent=filtered.length+"件";
+
+  if(!filtered.length){
+    emEl.style.display="block";
+    emEl.textContent=q?"該当するメモがありません":"メモがありません。下から追加してください。";
+    return;
+  }
+  emEl.style.display="none";
+
+  filtered.forEach(note=>{
+    const c=COLORS[note.colorIdx??0];
+    const folder=S.folders.find(f=>f.id===note.folderId);
+    const card=document.createElement("div");
+    card.className="note-card"+(note.pinned?" pinned":"")+(S.viewMode==="list"?" list-card":"");
+    card.style.background=c.bg;
+    if(S.viewMode==="list"){
+      card.style.borderColor="transparent";
+      card.style.borderLeftColor=folder?.color||c.bd;
+      card.style.borderTopColor="rgba(0,0,0,0.08)";
+      card.style.borderRightColor="rgba(0,0,0,0.08)";
+      card.style.borderBottomColor="rgba(0,0,0,0.08)";
+    } else {
+      card.style.borderColor=note.pinned?"#e94560":c.bd;
+    }
+    S.viewMode==="grid"?renderGrid(card,note,folder,c):renderList(card,note,folder);
+    container.appendChild(card);
+  });
+}
+
+function renderGrid(card,note,folder,c){
+  // トップバー
+  const top=document.createElement("div"); top.className="card-top";
+  top.append(
+    mkBtn(note.favorite?"⭐":"☆",note.favorite?"on":"","お気に入り",()=>{ note.favorite=!note.favorite; save(); renderSidebar(); render(); }),
+    mkBtn("📌",note.pinned?"on":"",note.pinned?"ピン解除":"ピン留め",()=>{ note.pinned=!note.pinned; save(); render(); }),
+    mkBtn("✏️","","編集",()=>startEdit(note)),
+    mkBtn("🗑️","","削除",()=>{ if(confirm("削除しますか？")){ S.notes=S.notes.filter(n=>n.id!==note.id); save(); renderSidebar(); render(); }})
+  );
+  if(folder){
+    const tag=document.createElement("div"); tag.className="card-folder-tag";
+    tag.textContent=folder.name;
+    tag.style.background=folder.color+"22"; tag.style.color=folder.color;
+    top.appendChild(tag);
+  }
+  card.appendChild(top);
+
+  // コンテンツ
+  if(note.type==="task") renderTaskBody(card,note);
+  else {
+    const t=document.createElement("div"); t.className="card-text"; t.textContent=note.text;
+    t.onclick=()=>startEdit(note); card.appendChild(t);
+  }
+  const d=document.createElement("div"); d.className="card-date"; d.textContent=fmtDate(note.updatedAt);
+  card.appendChild(d);
+}
+
+function renderList(card,note,folder){
+  card.append(
+    mkBtn(note.favorite?"⭐":"☆",note.favorite?"on":"","お気に入り",()=>{ note.favorite=!note.favorite; save(); renderSidebar(); render(); }),
+    mkBtn("📌",note.pinned?"on":"",note.pinned?"ピン解除":"ピン留め",()=>{ note.pinned=!note.pinned; save(); render(); })
+  );
+  const t=document.createElement("div"); t.className="list-text";
+  t.textContent=note.type==="task"?`✅ ${note.title||"タスク"} (${(note.tasks||[]).filter(x=>x.done).length}/${(note.tasks||[]).length}完了)`:note.text;
+  t.onclick=()=>t.classList.toggle("expanded");
+  const meta=document.createElement("div"); meta.className="list-meta";
+  meta.innerHTML=`${folder?esc(folder.name):""}<br>${fmtDate(note.updatedAt)}`;
+  const acts=document.createElement("div"); acts.className="list-actions";
+  acts.append(
+    mkBtn("✏️","","編集",()=>startEdit(note)),
+    mkBtn("🗑️","","削除",()=>{ if(confirm("削除しますか？")){ S.notes=S.notes.filter(n=>n.id!==note.id); save(); renderSidebar(); render(); }})
+  );
+  card.append(t,meta,acts);
+}
+
+function renderTaskBody(card,note){
+  const titleEl=document.createElement("div"); titleEl.className="task-card-title"; titleEl.textContent=note.title||"タスク";
+  const done=(note.tasks||[]).filter(t=>t.done).length;
+  const prog=document.createElement("div"); prog.className="task-card-prog"; prog.textContent=`${done}/${(note.tasks||[]).length} 完了`;
+  const list=document.createElement("div"); list.className="task-list";
+  (note.tasks||[]).forEach(t=>{
+    const row=document.createElement("div"); row.className="task-row"+(t.done?" done":"");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=t.done;
+    cb.onchange=()=>{ t.done=cb.checked; note.updatedAt=Date.now(); save(); render(); };
+    const sp=document.createElement("span"); sp.textContent=t.text;
+    row.append(cb,sp); list.appendChild(row);
+  });
+  card.append(titleEl,prog,list);
+}
+
+/* -------- 編集モーダル -------- */
+let editTargetNote = null;
+let editColorIdx = 0;
+
+function openEditModal(note) {
+  editTargetNote = note;
+  editColorIdx = note.colorIdx ?? 0;
+  const folder = S.folders.find(f=>f.id===note.folderId);
+  const c = COLORS[editColorIdx];
+
+  // ヘッダー
+  const tag = document.getElementById("edit-folder-tag");
+  tag.textContent = folder?.name || "未分類";
+  tag.style.background = (folder?.color||"#555")+"22";
+  tag.style.color = folder?.color||"#555";
+  document.getElementById("edit-date").textContent =
+    "作成: "+fmtDate(note.createdAt)+" ／ 更新: "+fmtDate(note.updatedAt);
+
+  // カラーピッカー
+  const cp = document.getElementById("edit-color-picker");
+  cp.innerHTML = "";
+  COLORS.forEach((c2,i)=>{
+    const d = document.createElement("div");
+    d.className = "edit-cdot"+(i===editColorIdx?" active":"");
+    d.style.background=c2.bg; d.style.borderColor=c2.bd;
+    d.onclick=()=>{
+      editColorIdx=i;
+      cp.querySelectorAll(".edit-cdot").forEach((x,j)=>x.classList.toggle("active",j===i));
+      document.getElementById("edit-box").style.borderColor = COLORS[i].bd;
+    };
+    cp.appendChild(d);
+  });
+
+  // ボックス境界色
+  document.getElementById("edit-box").style.borderColor = c.bd;
+
+  // フォルダselectを更新
+  const sel = document.getElementById("edit-folder-sel");
+  sel.innerHTML = S.folders.map(f=>`<option value="${f.id}"${f.id===note.folderId?" selected":""}>${esc(f.name)}</option>`).join("");
+
+  if(note.type==="task"){
+    document.getElementById("edit-textarea").style.display="none";
+    const area = document.getElementById("edit-task-area");
+    area.classList.add("show");
+    document.getElementById("edit-task-title-inp").value = note.title||"";
+    buildEditTaskList(note);
+  } else {
+    document.getElementById("edit-task-area").classList.remove("show");
+    const ta = document.getElementById("edit-textarea");
+    ta.style.display="flex";
+    ta.value = note.text||"";
+    ta.style.background = c.bg+"33";
+    setTimeout(()=>{ ta.focus(); ta.selectionStart=ta.selectionEnd=ta.value.length; },80);
+  }
+
+  document.getElementById("edit-overlay").classList.add("show");
+}
+
+function buildEditTaskList(note){
+  const list = document.getElementById("edit-task-list");
+  list.innerHTML="";
+  (note.tasks||[]).forEach((t,i)=>{
+    const row = document.createElement("div"); row.className="et-row";
+    const cb = document.createElement("input"); cb.type="checkbox"; cb.className="et-cb"; cb.checked=t.done;
+    const inp = document.createElement("input"); inp.type="text"; inp.className="et-inp"+(t.done?" done-inp":"");
+    inp.value=t.text;
+    cb.onchange=()=>{ inp.classList.toggle("done-inp",cb.checked); };
+    const rm = document.createElement("button"); rm.className="et-rm"; rm.textContent="✕";
+    rm.onclick=()=>row.remove();
+    row.append(cb,inp,rm);
+    list.appendChild(row);
+  });
+}
+
+function closeEditModal(){
+  document.getElementById("edit-overlay").classList.remove("show");
+  editTargetNote=null;
+}
+
+function saveEditModal(){
+  const note = editTargetNote;
+  if(!note) return;
+  note.colorIdx = editColorIdx;
+  note.folderId = document.getElementById("edit-folder-sel").value || note.folderId;
+  note.updatedAt = Date.now();
+
+  if(note.type==="task"){
+    note.title = document.getElementById("edit-task-title-inp").value.trim() || note.title;
+    const rows = document.getElementById("edit-task-list").querySelectorAll(".et-row");
+    note.tasks = Array.from(rows).map((row,i)=>({
+      id: i+1,
+      text: row.querySelector(".et-inp").value.trim(),
+      done: row.querySelector(".et-cb").checked
+    })).filter(t=>t.text);
+  } else {
+    const v = document.getElementById("edit-textarea").value.trim();
+    if(!v){ if(confirm("内容が空です。このメモを削除しますか？")){ S.notes=S.notes.filter(n=>n.id!==note.id); save(); renderSidebar(); render(); closeEditModal(); } return; }
+    note.text = v;
+  }
+  save(); renderSidebar(); render(); closeEditModal();
+}
+
+// 編集モーダルのイベント
+document.getElementById("edit-close").onclick = closeEditModal;
+document.getElementById("edit-overlay").onclick = e=>{ if(e.target===document.getElementById("edit-overlay")) closeEditModal(); };
+document.getElementById("edit-save-btn").onclick = saveEditModal;
+document.getElementById("edit-del-btn").onclick = ()=>{
+  if(!editTargetNote) return;
+  if(confirm("このメモを削除しますか？")){
+    S.notes=S.notes.filter(n=>n.id!==editTargetNote.id);
+    save(); renderSidebar(); render(); closeEditModal();
+  }
+};
+document.getElementById("edit-add-task-row").onclick = ()=>{
+  const list=document.getElementById("edit-task-list");
+  const row=document.createElement("div"); row.className="et-row";
+  const cb=document.createElement("input"); cb.type="checkbox"; cb.className="et-cb";
+  const inp=document.createElement("input"); inp.type="text"; inp.className="et-inp"; inp.placeholder="タスクを入力";
+  const rm=document.createElement("button"); rm.className="et-rm"; rm.textContent="✕";
+  rm.onclick=()=>row.remove();
+  cb.onchange=()=>inp.classList.toggle("done-inp",cb.checked);
+  row.append(cb,inp,rm); list.appendChild(row); inp.focus();
+};
+// Ctrl+Enter で保存、Esc で閉じる
+document.addEventListener("keydown",e=>{
+  if(!document.getElementById("edit-overlay").classList.contains("show")) return;
+  if(e.key==="Escape") closeEditModal();
+  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)) saveEditModal();
+});
+
+// 旧startEditは編集モーダルに統合
+function startEdit(note){ openEditModal(note); }
+
+function mkBtn(label,extraClass,title,fn){
+  const b=document.createElement("button"); b.className="card-btn "+(extraClass||"");
+  b.textContent=label; b.title=title; b.onclick=fn; return b;
+}
+function fmtDate(ts){
+  const d=new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ============================================================
+   スマホ用ドロワー制御
+   ============================================================ */
+function isMobile(){ return window.matchMedia("(max-width: 768px)").matches; }
+function closeSidebarOnMobile(){
+  if(isMobile()) document.getElementById("sidebar").classList.add("collapsed");
+}
+// 背景タップでサイドバーを閉じる
+document.getElementById("sidebar-backdrop").onclick=()=>document.getElementById("sidebar").classList.add("collapsed");
+// スマホ用メニュー（ヘッダーから隠したボタンの代替）
+document.getElementById("m-grid").onclick=()=>{ setViewMode("grid"); closeSidebarOnMobile(); };
+document.getElementById("m-list").onclick=()=>{ setViewMode("list"); closeSidebarOnMobile(); };
+document.getElementById("m-clipboard").onclick=()=>{ document.getElementById("btn-clipboard").click(); closeSidebarOnMobile(); };
+document.getElementById("m-file").onclick=()=>{ document.getElementById("btn-file").click(); closeSidebarOnMobile(); };
+// PCではサイドバーを開いた状態で開始
+if(!isMobile()) document.getElementById("sidebar").classList.remove("collapsed");
+
+init();
+
+/* ============================================================
+   Service Worker 登録（オフライン対応）
+   ============================================================ */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(err => {
+      console.warn("[柏井メモ] SW登録失敗:", err);
+    });
+  });
+}
+</script>
+</body>
+</html>
