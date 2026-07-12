@@ -5270,8 +5270,8 @@ document.addEventListener('click', e=>{
 /* =========================================================
  *  物件登録一覧（localStorage管理）
  * ========================================================= */
-const PROPLIST_KEY = 'appraisal_property_list_v1';
-const CURRENT_ID_KEY = 'appraisal_current_id';
+const PROPLIST_KEY = 'demo_appraisal_property_list_v1';
+const CURRENT_ID_KEY = 'demo_appraisal_current_id';
 
 function getPropertyList(){
   try{ return JSON.parse(localStorage.getItem(PROPLIST_KEY)||'[]'); }catch(e){ return []; }
@@ -5292,9 +5292,8 @@ function savePropertyList(list){
 let _syncDebounceTimer = null;
 let _lastSyncedHash = '';
 function _proxyUrl(){
-  // 物件同期用：Claude APIキー欄がGAS URLならそれを使い、sk-ant-...形式ならデフォルトGAS URLを使う
-  if(_isProxyUrl(STATE.apiKey)) return STATE.apiKey;
-  return DEFAULT_CLAUDE_PROXY_URL || '';
+  // デモ環境：本番クラウド(Drive/Sheets)への読み書きを完全に無効化し、ブラウザローカルのみで完結させる
+  return '';
 }
 async function syncPropertiesToCloud(list, opts={}){
   const url = _proxyUrl();
@@ -5679,7 +5678,7 @@ setTimeout(()=>{
   $('#btnNewProperty')?.addEventListener('click', ()=>{
     STATE.currentPropertyId = '';
     localStorage.removeItem(CURRENT_ID_KEY);
-    localStorage.removeItem('appraisal_snapshot_v1');
+    localStorage.removeItem('demo_appraisal_snapshot_v1');
     location.hash = '';
     location.reload();
   });
@@ -5890,14 +5889,14 @@ function seedAzureMeguro(){
 
   list.unshift(entry);
   savePropertyList(list);
-  localStorage.setItem('seed_azure_loaded', '1');
+  localStorage.setItem('demo_seed_azure_loaded', '1');
   renderPropertyList();
   showToast('✅ サンプル物件「アジュール目黒」を登録しました','success');
 }
 
 /* 初回起動時に自動でサンプル物件を登録（物件リストが空かつ未登録フラグ時のみ） */
 setTimeout(()=>{
-  if(!localStorage.getItem('seed_azure_loaded') && getPropertyList().length === 0){
+  if(!localStorage.getItem('demo_seed_azure_loaded') && getPropertyList().length === 0){
     try{ seedAzureMeguro(); }catch(e){ console.warn('seed失敗', e); }
   }
 }, 400);
@@ -6809,7 +6808,7 @@ document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !$('#glossary
 /* =========================================================
  *  自動保存・復元（localStorage）
  * ========================================================= */
-const SNAPSHOT_KEY = 'appraisal_snapshot_v1';
+const SNAPSHOT_KEY = 'demo_appraisal_snapshot_v1';
 
 function saveSnapshot(){
   try{
