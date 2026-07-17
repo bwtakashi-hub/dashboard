@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>経営ダッシュボード | 株式会社住まっぷ</title>
+  <style>
+    :root {
+      --navy:        #1e3a5f;
+      --navy-dark:   #152c47;
+      --blue:        #2563eb;
+      --green:       #16a34a;
+      --red:         #dc2626;
+      --orange:      #ea580c;
+      --yellow:      #f5c518;
+      --bg:          #f1f5f9;
+      --surface:     #ffffff;
+      --text:        #0f172a;
+      --muted:       #64748b;
+      --border:      #e2e8f0;
+      --radius:      12px;
+      --radius-sm:   8px;
+      --shadow:      0 2px 8px rgba(0,0,0,0.10);
+      --shadow-hover:0 8px 24px rgba(0,0,0,0.18);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; padding: 24px 16px 56px;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ヘッダー */
+    .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .head h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.03em; }
+    .head .fy-note { font-size: 0.85rem; color: var(--muted); }
+    .head .spacer { flex: 1; }
+    .head .stamp { font-size: 0.78rem; color: var(--muted); text-align: right; }
+    .btn {
+      border: none; border-radius: var(--radius-sm); padding: 9px 16px;
+      font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      background: var(--navy); color: #fff; box-shadow: var(--shadow);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn:hover { background: var(--navy-dark); transform: translateY(-1px); }
+    .btn.ghost { background: var(--surface); color: var(--navy); border: 1px solid var(--border); }
+    .btn.ghost:hover { background: #f8fafc; }
+
+    /* バナー */
+    .banner {
+      background: #fff8e1; border: 1px solid #f5c518; border-radius: var(--radius-sm);
+      padding: 12px 16px; font-size: 0.85rem; color: #5a4000; display: none;
+    }
+    .banner.show { display: block; }
+    .banner.error { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+
+    /* 年度・月セレクタ */
+    .selector { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .fy-switch { display: flex; gap: 4px; background: var(--surface); border-radius: var(--radius-sm); padding: 4px; box-shadow: var(--shadow); }
+    .fy-switch button {
+      border: none; background: transparent; font-family: inherit; font-weight: 700;
+      font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; color: var(--muted);
+    }
+    .fy-switch button.active { background: var(--navy); color: #fff; }
+    .months { display: flex; gap: 4px; flex-wrap: wrap; background: var(--surface); border-radius: var(--radius-sm); padding: 4px; box-shadow: var(--shadow); }
+    .months button {
+      border: none; background: transparent; font-family: inherit; font-weight: 700;
+      font-size: 0.82rem; padding: 7px 11px; border-radius: 6px; cursor: pointer; color: var(--muted);
+    }
+    .months button.active { background: var(--blue); color: #fff; }
+    .months button.hasdata { color: var(--text); }
+
+    /* KPI */
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .kpi {
+      background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 16px 18px; display: flex; flex-direction: column; gap: 6px;
+      border-top: 4px solid var(--blue);
+    }
+    .kpi.green { border-top-color: var(--green); }
+    .kpi.red { border-top-color: var(--red); }
+    .kpi.navy { border-top-color: var(--navy); }
+    .kpi .label { font-size: 0.75rem; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; }
+    .kpi .value { font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .kpi .sub { font-size: 0.75rem; color: var(--muted); }
+
+    /* セクション */
+    .section { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .section-label {
+      padding: 13px 20px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em;
+      color: #475569; background: #f8fafc; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label .right { margin-left: auto; font-size: 0.72rem; font-weight: 500; color: var(--muted); }
+    .section-body { padding: 18px 20px 20px; }
+
+    /* グラフ */
+    .chart-wrap { overflow-x: auto; }
+    svg text { font-family: inherit; }
+    .legend { display: flex; gap: 16px; font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
+    .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+    /* テーブル */
+    .table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    thead th {
+      position: sticky; top: 0; background: var(--navy); color: #fff; font-weight: 700;
+      padding: 9px 10px; text-align: left; white-space: nowrap; z-index: 1;
+    }
+    tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr:nth-child(even) { background: #f5f7fa; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .empty { text-align: center; color: var(--muted); padding: 28px 10px; font-size: 0.85rem; }
+
+    /* フィルタチップ */
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chip {
+      border: 1px solid var(--border); background: #fff; border-radius: 999px;
+      padding: 5px 13px; font-family: inherit; font-size: 0.78rem; font-weight: 700;
+      color: var(--muted); cursor: pointer;
+    }
+    .chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    /* ステータスバッジ */
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+    .badge.unsettled { background: #fee2e2; color: #991b1b; }
+    .badge.settled { background: #dcfce7; color: #166534; }
+    .badge.partially_paid { background: #ffedd5; color: #9a3412; }
+
+    /* 銀行カード */
+    .banks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+    .bank {
+      border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px 15px;
+      display: flex; flex-direction: column; gap: 4px; background: #fbfdff;
+    }
+    .bank .name { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+    .bank .bal { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .bank.total { background: #e8f4fd; border-color: #bfdbfe; }
+    .bank.total .bal { color: var(--navy); font-size: 1.3rem; }
+
+    /* 設定モーダル */
+    .modal-bg {
+      display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-bg.show { display: flex; }
+    .modal {
+      background: #fff; border-radius: var(--radius); padding: 24px; max-width: 560px; width: 100%;
+      display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow-hover);
+    }
+    .modal h2 { font-size: 1.05rem; }
+    .modal p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    .modal input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-family: inherit; font-size: 0.85rem;
+    }
+    .modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+    @media (max-width: 760px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .banks { grid-template-columns: 1fr; }
+      .head h1 { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1>📊 経営ダッシュボード</h1>
+    <span class="fy-note" id="fyNote"></span>
+    <span class="spacer"></span>
+    <span class="stamp" id="stamp"></span>
+    <button class="btn ghost" onclick="openSettings()">⚙️ 設定</button>
+    <button class="btn" onclick="loadData(true)">🔄 更新</button>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="selector">
+    <div class="fy-switch" id="fySwitch"></div>
+    <div class="months" id="monthBtns"></div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi green">
+      <span class="label">スマレジ売上（表示月）</span>
+      <span class="value" id="kpiSales">—</span>
+      <span class="sub" id="kpiSalesSub"></span>
+    </div>
+    <div class="kpi">
+      <span class="label">請求書発行額（表示月）</span>
+      <span class="value" id="kpiInv">—</span>
+      <span class="sub" id="kpiInvSub"></span>
+    </div>
+    <div class="kpi red">
+      <span class="label">未回収額（年度累計）</span>
+      <span class="value" id="kpiUnpaid">—</span>
+      <span class="sub" id="kpiUnpaidSub"></span>
+    </div>
+    <div class="kpi navy">
+      <span class="label">銀行残高合計（現在）</span>
+      <span class="value" id="kpiBank">—</span>
+      <span class="sub" id="kpiBankSub"></span>
+    </div>
+  </div>
+
+  <!-- スマレジ売上 -->
+  <div class="section">
+    <div class="section-label">🛒 スマレジ売上管理<span class="right">スマレジ売上管理SS「日別売上」より</span></div>
+    <div class="section-body">
+      <div class="legend">
+        <span><span class="dot" style="background:#2563eb"></span>58ビレッジ</span>
+        <span><span class="dot" style="background:#16a34a"></span>住吉ビレッジ</span>
+      </div>
+      <div class="chart-wrap" id="salesChart"></div>
+      <h3 style="font-size:0.85rem;margin:16px 0 8px;color:#475569" id="dailyTitle">日別売上</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>日付</th><th class="num">58 現金</th><th class="num">58 振込</th>
+            <th class="num">住吉 現金</th><th class="num">住吉 振込</th><th class="num">合計</th>
+          </tr></thead>
+          <tbody id="dailyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- freee請求書 -->
+  <div class="section">
+    <div class="section-label">📄 freee請求書取り込み<span class="right">freee残高管理SS「請求書転記専用（全）」より（毎日0:00自動更新）</span></div>
+    <div class="section-body">
+      <div class="chips" id="bizChips">
+        <button class="chip active" data-biz="">全事業所</button>
+        <button class="chip" data-biz="種子島">🌴 種子島</button>
+        <button class="chip" data-biz="不動産">🏢 不動産</button>
+      </div>
+      <div class="chips" id="statusChips">
+        <button class="chip active" data-st="">全ステータス</button>
+        <button class="chip" data-st="unsettled">未入金</button>
+        <button class="chip" data-st="partially_paid">一部入金</button>
+        <button class="chip" data-st="settled">入金済</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>No</th><th>発行日</th><th>請求先</th><th>件名</th>
+            <th class="num">金額(税込)</th><th>ステータス</th><th>支払期日</th><th>事業所</th>
+          </tr></thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 銀行口座 -->
+  <div class="section">
+    <div class="section-label">🏦 銀行口座管理<span class="right" id="bankStamp">freee残高管理SS「★残高情報★」より（1日2回自動更新）</span></div>
+    <div class="section-body">
+      <div class="banks" id="bankCards"></div>
+      <div class="legend"><span><span class="dot" style="background:#1e3a5f"></span>全口座合計残高の推移</span></div>
+      <div class="chart-wrap" id="bankChart"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>⚙️ データ接続設定</h2>
+    <p>
+      GAS Webアプリ（経営ダッシュボードAPI）の <b>/exec URL</b> を貼り付けてください。
+      未設定の間はデモデータを表示します。<br>
+      （URLはこの端末のブラウザにのみ保存されます）
+    </p>
+    <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="row">
+      <button class="btn ghost" onclick="closeSettings()">閉じる</button>
+      <button class="btn" onclick="saveSettings()">保存して再読込</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 設定 =====
+const API_KEY = 'sumap-keiei-2026';
+const LS_URL = 'keieiApiUrl';
+
+// ===== 年度定義（住まっぷ: 7月決算 → 8月開始） =====
+const FYS = [
+  { label: '2026年度', start: '2026-08' },
+  { label: '2025年度', start: '2025-08' },
+];
+let fyIdx = 0;                 // 表示中の年度
+let selMonth = null;           // 'YYYY-MM' or null(年度累計)
+let bizFilter = '', stFilter = '';
+let DATA = null;               // {invoices, sales, banks, generatedAt}
+let isDemo = false;
+
+// 年度の12ヶ月リスト ['2026-08', ...]
+function fyMonths(startYm) {
+  const [y, m] = startYm.split('-').map(Number);
+  const list = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(y, m - 1 + i, 1);
+    list.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  return list;
+}
+function fyRange() {
+  const ms = fyMonths(FYS[fyIdx].start);
+  return { months: ms, from: ms[0] + '-01', to: ms[11] + '-31' };
+}
+function yen(n) { return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+function ymOf(dateStr) { return (dateStr || '').substring(0, 7); }
+
+// ===== デモデータ =====
+function demoData() {
+  const sales = [], invoices = [];
+  const ms = fyMonths(FYS[fyIdx].start);
+  ms.slice(0, 3).forEach(function(ym, mi) {
+    for (let d = 1; d <= 28; d += 2) {
+      const date = ym + '-' + String(d).padStart(2, '0');
+      const a = 30000 + ((d * 7919 + mi * 104729) % 90000);
+      const b = 20000 + ((d * 6151 + mi * 130649) % 70000);
+      sales.push({ date: date, v58cash: a, v58bank: 0, sumiCash: b, sumiBank: 0, total: a + b });
+    }
+    ['種子島', '不動産'].forEach(function(biz, bi) {
+      for (let k = 1; k <= 4; k++) {
+        invoices.push({
+          no: 'DEMO-' + ym + '-' + bi + k, date: ym + '-' + String(k * 6).padStart(2, '0'),
+          client: biz === '種子島' ? 'サンプル建設JV' : 'サンプル管理会社',
+          subject: biz === '種子島' ? '宿泊費 ' + ym : '管理物件 ' + ym,
+          amount: 100000 + k * 55000 + bi * 30000, tax: 10000,
+          status: k % 3 === 0 ? 'settled' : (k % 3 === 1 ? 'unsettled' : 'partially_paid'),
+          due: ym + '-28', biz: biz,
+        });
+      }
+    });
+  });
+  const accounts = [
+    { no: 1, name: '①きらぼし銀行（不動産）', balance: 4500000 },
+    { no: 2, name: '②楽天銀行（不動産）', balance: 8400000 },
+    { no: 3, name: '③GMOあおぞら BlueBank支店', balance: 3200000 },
+    { no: 4, name: '④楽天銀行 58口座', balance: 1500000 },
+    { no: 5, name: '⑤楽天銀行 住吉口座', balance: 1100000 },
+  ];
+  const history = [];
+  for (let i = 30; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const dt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' 10:00';
+    history.push({ datetime: dt, account: '', balance: 0, diff: 0, grandTotal: 17500000 + (i * 37) % 5 * 250000 - i * 30000 });
+  }
+  return {
+    generatedAt: 'デモデータ',
+    invoices: invoices, sales: sales,
+    banks: { updatedAt: 'デモ', accounts: accounts, history: history },
+  };
+}
+
+// ===== データ読込 =====
+function loadData(force) {
+  const url = localStorage.getItem(LS_URL);
+  const banner = document.getElementById('banner');
+  if (!url) {
+    isDemo = true;
+    DATA = demoData();
+    banner.className = 'banner show';
+    banner.innerHTML = '⚠️ <b>デモデータ表示中</b> — 右上の「⚙️ 設定」からGAS APIのURLを登録すると実データが表示されます。';
+    render();
+    return;
+  }
+  banner.className = 'banner';
+  document.getElementById('stamp').textContent = '読込中...';
+  fetch(url + '?key=' + encodeURIComponent(API_KEY) + (force ? '&t=' + Date.now() : ''))
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.error) throw new Error(json.error);
+      isDemo = false;
+      DATA = json;
+      render();
+    })
+    .catch(function(err) {
+      isDemo = true;
+      DATA = demoData();
+      banner.className = 'banner error show';
+      banner.innerHTML = '❌ API読込エラー: ' + err.message + ' — デモデータを表示しています。⚙️設定のURLを確認してください。';
+      render();
+    });
+}
+
+// ===== 描画 =====
+function render() {
+  const fy = FYS[fyIdx];
+  const range = fyRange();
+  document.getElementById('fyNote').textContent = fy.label + '（' + range.months[0].replace('-', '/') + '〜' + range.months[11].replace('-', '/') + '・7月決算）';
+  document.getElementById('stamp').textContent = isDemo ? '' : 'データ生成: ' + (DATA.generatedAt || '');
+
+  renderFySwitch();
+  renderMonthBtns();
+  renderKpis();
+  renderSalesChart();
+  renderDaily();
+  renderInvoices();
+  renderBanks();
+}
+
+function renderFySwitch() {
+  const el = document.getElementById('fySwitch');
+  el.innerHTML = FYS.map(function(f, i) {
+    return '<button class="' + (i === fyIdx ? 'active' : '') + '" onclick="setFy(' + i + ')">' + f.label + '</button>';
+  }).join('');
+}
+function setFy(i) { fyIdx = i; selMonth = null; if (isDemo) DATA = demoData(); render(); }
+
+function renderMonthBtns() {
+  const range = fyRange();
+  const salesByM = {}, invByM = {};
+  DATA.sales.forEach(function(s) { salesByM[ymOf(s.date)] = true; });
+  DATA.invoices.forEach(function(v) { invByM[ymOf(v.date)] = true; });
+  const el = document.getElementById('monthBtns');
+  let html = '<button class="' + (selMonth === null ? 'active' : '') + '" onclick="setMonth(null)">年度累計</button>';
+  range.months.forEach(function(ym) {
+    const has = salesByM[ym] || invByM[ym];
+    html += '<button class="' + (selMonth === ym ? 'active' : '') + (has ? ' hasdata' : '') + '" onclick="setMonth(\'' + ym + '\')">' + Number(ym.split('-')[1]) + '月</button>';
+  });
+  el.innerHTML = html;
+}
+function setMonth(ym) { selMonth = ym; render(); }
+
+function inScope(dateStr) {
+  const range = fyRange();
+  if (!dateStr || dateStr < range.from || dateStr > range.to) return false;
+  return selMonth === null || ymOf(dateStr) === selMonth;
+}
+function inFy(dateStr) {
+  const range = fyRange();
+  return dateStr && dateStr >= range.from && dateStr <= range.to;
+}
+
+function renderKpis() {
+  let sales = 0, days = 0;
+  DATA.sales.forEach(function(s) { if (inScope(s.date)) { sales += s.total; days++; } });
+  document.getElementById('kpiSales').textContent = yen(sales);
+  document.getElementById('kpiSalesSub').textContent = (selMonth ? selMonth.replace('-', '/') : '年度累計') + '・' + days + '日分';
+
+  let inv = 0, cnt = 0;
+  DATA.invoices.forEach(function(v) { if (inScope(v.date)) { inv += v.amount; cnt++; } });
+  document.getElementById('kpiInv').textContent = yen(inv);
+  document.getElementById('kpiInvSub').textContent = cnt + '件';
+
+  let unpaid = 0, ucnt = 0;
+  DATA.invoices.forEach(function(v) {
+    if (inFy(v.date) && (v.status === 'unsettled' || v.status === 'partially_paid')) { unpaid += v.amount; ucnt++; }
+  });
+  document.getElementById('kpiUnpaid').textContent = yen(unpaid);
+  document.getElementById('kpiUnpaidSub').textContent = ucnt + '件（未入金＋一部入金）';
+
+  let bank = 0;
+  (DATA.banks.accounts || []).forEach(function(a) { bank += a.balance; });
+  document.getElementById('kpiBank').textContent = yen(bank);
+  document.getElementById('kpiBankSub').textContent = (DATA.banks.accounts || []).length + '口座・更新 ' + (DATA.banks.updatedAt || '—');
+}
+
+// 月別売上棒グラフ (SVG)
+function renderSalesChart() {
+  const range = fyRange();
+  const agg = {};
+  range.months.forEach(function(ym) { agg[ym] = { v58: 0, sumi: 0 }; });
+  DATA.sales.forEach(function(s) {
+    const ym = ymOf(s.date);
+    if (agg[ym]) { agg[ym].v58 += s.v58cash + s.v58bank; agg[ym].sumi += s.sumiCash + s.sumiBank; }
+  });
+  const max = Math.max(100000, ...range.months.map(function(ym) { return agg[ym].v58 + agg[ym].sumi; }));
+  const W = 960, H = 230, PAD = 56, BW = 34;
+  const step = (W - PAD - 20) / 12;
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="min-width:720px;width:100%">';
+  for (let g = 0; g <= 4; g++) {
+    const y = 12 + (H - 52) * g / 4;
+    const val = max * (4 - g) / 4;
+    svg += '<line x1="' + PAD + '" y1="' + y + '" x2="' + (W - 10) + '" y2="' + y + '" stroke="#e2e8f0"/>';
+    svg += '<text x="' + (PAD - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="10" fill="#94a3b8">' + (val >= 10000 ? Math.round(val / 10000) + '万' : Math.round(val)) + '</text>';
+  }
+  range.months.forEach(function(ym, i) {
+    const x = PAD + step * i + (step - BW) / 2;
+    const h58 = (H - 52) * agg[ym].v58 / max;
+    const hSu = (H - 52) * agg[ym].sumi / max;
+    const yBase = H - 40;
+    svg += '<rect x="' + x + '" y="' + (yBase - h58) + '" width="' + BW + '" height="' + h58 + '" fill="#2563eb" rx="2"/>';
+    svg += '<rect x="' + x + '" y="' + (yBase - h58 - hSu) + '" width="' + BW + '" height="' + hSu + '" fill="#16a34a" rx="2"/>';
+    const total = agg[ym].v58 + agg[ym].sumi;
+    if (total > 0) {
+      svg += '<text x="' + (x + BW / 2) + '" y="' + (yBase - h58 - hSu - 5) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#334155">' + Math.round(total / 10000) + '万</text>';
+    }
+    const sel = selMonth === ym;
+    svg += '<text x="' + (x + BW / 2) + '" y="' + (H - 24) + '" text-anchor="middle" font-size="10.5" font-weight="' + (sel ? '800' : '400') + '" fill="' + (sel ? '#2563eb' : '#64748b') + '">' + Number(ym.split('-')[1]) + '月</text>';
+  });
+  svg += '</svg>';
+  document.getElementById('salesChart').innerHTML = svg;
+}
+
+function renderDaily() {
+  const rows = DATA.sales.filter(function(s) { return inScope(s.date); });
+  rows.sort(function(a, b) { return a.date < b.date ? 1 : -1; });
+  document.getElementById('dailyTitle').textContent = '日別売上（' + (selMonth ? selMonth.replace('-', '/') : '年度累計・新しい順') + '）';
+  const body = document.getElementById('dailyBody');
+  if (rows.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">この期間の売上データはまだありません</td></tr>';
+    return;
+  }
+  let t = { c58: 0, b58: 0, cSu: 0, bSu: 0, all: 0 };
+  const html = rows.map(function(s) {
+    t.c58 += s.v58cash; t.b58 += s.v58bank; t.cSu += s.sumiCash; t.bSu += s.sumiBank; t.all += s.total;
+    return '<tr><td>' + s.date + '</td><td class="num">' + yen(s.v58cash) + '</td><td class="num">' + yen(s.v58bank) +
+      '</td><td class="num">' + yen(s.sumiCash) + '</td><td class="num">' + yen(s.sumiBank) +
+      '</td><td class="num"><b>' + yen(s.total) + '</b></td></tr>';
+  }).join('');
+  body.innerHTML = '<tr style="background:#e8f4fd;font-weight:800"><td>合　計</td><td class="num">' + yen(t.c58) + '</td><td class="num">' + yen(t.b58) +
+    '</td><td class="num">' + yen(t.cSu) + '</td><td class="num">' + yen(t.bSu) + '</td><td class="num">' + yen(t.all) + '</td></tr>' + html;
+}
+
+const ST_LABEL = { unsettled: '未入金', settled: '入金済', partially_paid: '一部入金' };
+function renderInvoices() {
+  const rows = DATA.invoices.filter(function(v) {
+    if (!inScope(v.date)) return false;
+    if (bizFilter && v.biz !== bizFilter) return false;
+    if (stFilter && v.status !== stFilter) return false;
+    return true;
+  });
+  rows.sort(function(a, b) { return a.date < b.date ? 1 : -1; });
+  const body = document.getElementById('invBody');
+  if (rows.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" class="empty">この条件の請求書はありません</td></tr>';
+    return;
+  }
+  let total = 0;
+  const html = rows.map(function(v) {
+    total += v.amount;
+    const st = ST_LABEL[v.status] || v.status;
+    return '<tr><td>' + esc(v.no) + '</td><td>' + v.date + '</td><td>' + esc(v.client) + '</td><td>' + esc(v.subject) +
+      '</td><td class="num">' + yen(v.amount) + '</td><td><span class="badge ' + esc(v.status) + '">' + esc(st) +
+      '</span></td><td>' + (v.due || '—') + '</td><td>' + esc(v.biz) + '</td></tr>';
+  }).join('');
+  body.innerHTML = '<tr style="background:#e8f4fd;font-weight:800"><td colspan="3">合　計（' + rows.length + '件）</td><td></td><td class="num">' + yen(total) + '</td><td colspan="3"></td></tr>' + html;
+}
+
+function renderBanks() {
+  const cards = document.getElementById('bankCards');
+  const accounts = DATA.banks.accounts || [];
+  let total = 0;
+  let html = accounts.map(function(a) {
+    total += a.balance;
+    return '<div class="bank"><span class="name">' + esc(a.name) + '</span><span class="bal">' + yen(a.balance) + '</span></div>';
+  }).join('');
+  html += '<div class="bank total"><span class="name">💰 全口座合計</span><span class="bal">' + yen(total) + '</span></div>';
+  // 3列グリッドの余りをグレー予備カードで埋める
+  const rem = (accounts.length + 1) % 3;
+  if (rem !== 0) {
+    for (let i = 0; i < 3 - rem; i++) {
+      html += '<div class="bank" style="background:#f1f5f9;border-style:dashed"><span class="name" style="color:#cbd5e1">予備</span><span class="bal" style="color:#cbd5e1">—</span></div>';
+    }
+  }
+  cards.innerHTML = html;
+
+  // 残高推移: 履歴の grandTotal を日単位で最後の値に集約
+  const byDay = {};
+  (DATA.banks.history || []).forEach(function(h) {
+    if (h.grandTotal > 0) byDay[h.datetime.substring(0, 10)] = h.grandTotal;
+  });
+  const days = Object.keys(byDay).sort();
+  const el = document.getElementById('bankChart');
+  if (days.length < 2) { el.innerHTML = '<div class="empty">残高履歴が不足しています</div>'; return; }
+  const vals = days.map(function(d) { return byDay[d]; });
+  const min = Math.min(...vals) * 0.97, max = Math.max(...vals) * 1.03;
+  const W = 960, H = 190, PAD = 70;
+  const x = function(i) { return PAD + (W - PAD - 14) * i / (days.length - 1); };
+  const y = function(v) { return 12 + (H - 48) * (1 - (v - min) / (max - min)); };
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="min-width:720px;width:100%">';
+  for (let g = 0; g <= 3; g++) {
+    const gy = 12 + (H - 48) * g / 3;
+    const val = max - (max - min) * g / 3;
+    svg += '<line x1="' + PAD + '" y1="' + gy + '" x2="' + (W - 10) + '" y2="' + gy + '" stroke="#e2e8f0"/>';
+    svg += '<text x="' + (PAD - 6) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="10" fill="#94a3b8">' + Math.round(val / 10000).toLocaleString() + '万</text>';
+  }
+  let path = '';
+  days.forEach(function(d, i) { path += (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ',' + y(byDay[d]).toFixed(1); });
+  svg += '<path d="' + path + '" fill="none" stroke="#1e3a5f" stroke-width="2.5"/>';
+  days.forEach(function(d, i) {
+    svg += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(byDay[d]).toFixed(1) + '" r="3" fill="#1e3a5f"><title>' + d + ' ' + yen(byDay[d]) + '</title></circle>';
+    if (i === 0 || i === days.length - 1 || i % Math.ceil(days.length / 8) === 0) {
+      svg += '<text x="' + x(i).toFixed(1) + '" y="' + (H - 18) + '" text-anchor="middle" font-size="9.5" fill="#64748b">' + d.substring(5).replace('-', '/') + '</text>';
+    }
+  });
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+// フィルタチップ
+document.getElementById('bizChips').addEventListener('click', function(e) {
+  const b = e.target.closest('.chip'); if (!b) return;
+  bizFilter = b.dataset.biz;
+  this.querySelectorAll('.chip').forEach(function(c) { c.classList.toggle('active', c === b); });
+  renderInvoices();
+});
+document.getElementById('statusChips').addEventListener('click', function(e) {
+  const b = e.target.closest('.chip'); if (!b) return;
+  stFilter = b.dataset.st;
+  this.querySelectorAll('.chip').forEach(function(c) { c.classList.toggle('active', c === b); });
+  renderInvoices();
+});
+
+// 設定モーダル
+function openSettings() {
+  document.getElementById('apiUrlInput').value = localStorage.getItem(LS_URL) || '';
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeSettings() { document.getElementById('modalBg').classList.remove('show'); }
+function saveSettings() {
+  const v = document.getElementById('apiUrlInput').value.trim();
+  if (v) localStorage.setItem(LS_URL, v); else localStorage.removeItem(LS_URL);
+  closeSettings();
+  loadData(true);
+}
+document.getElementById('modalBg').addEventListener('click', function(e) { if (e.target === this) closeSettings(); });
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// 初期表示: 今日が属する年度・月を自動選択
+(function init() {
+  const now = new Date();
+  const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  fyIdx = 0;
+  FYS.forEach(function(f, i) { if (fyMonths(f.start).indexOf(ym) >= 0) fyIdx = i; });
+  if (fyMonths(FYS[fyIdx].start).indexOf(ym) >= 0) selMonth = ym;
+  loadData(false);
+})();
+</script>
+</body>
+</html>
